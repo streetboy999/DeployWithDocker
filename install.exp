@@ -1,0 +1,12 @@
+#!/usr/bin/expect
+### Interact LSF installation. Called by the entrypoint.sh 
+set timeout 20
+set installFile [lindex $argv 0]
+
+spawn ./lsfinstall -f ./$installFile
+expect {
+	"to accept the agreement" {send "1\r";exp_continue}
+	"Press 1 or Enter to install this host type:" {send "1\r"}
+}
+
+expect eof

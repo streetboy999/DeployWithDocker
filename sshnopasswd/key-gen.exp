@@ -1,0 +1,11 @@
+#!/usr/bin/expect 
+#set enter "\n
+set timout 5
+spawn ssh-keygen -t rsa
+expect {
+	"Enter file in which to save the key" {send "\r";exp_continue}
+	"Overwrite (y/n)" {send "y\r";exp_continue}
+	"empty for no passphrase" {send "\r";exp_continue}
+	"again" {send "\n\r"}
+}
+expect eof
