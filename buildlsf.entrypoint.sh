@@ -4,9 +4,6 @@
 # LSF_TOP, IS_MASTER_NODE, LOCK_FILE, NO_GO, CLUSTER_NAME, IS_LAST_NODE
 
 
-# Trap signal to judge when to start LSF
-
-
 # Create User and UserGroup
 
 groupadd docker
