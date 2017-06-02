@@ -158,7 +158,7 @@ function funcBuildCluster() {
 		echo "Created LSF HOST: $hostName"
 
 		isMasterNode="N"
-		isLastNode=="N"
+		isLastNode=="N" 
 	done
 	docker cp $SSH_AUTO/hosts.$CLUSTER_NAME nfs:$NFS/sshnopasswd
 	rm $SSH_AUTO/hosts.$CLUSTER_NAME
