@@ -76,10 +76,12 @@ function funcInstall() {
 	lsfClusterName=$CLUSTER_NAME
 	lsfMasterName="master"
 	LSF_TOP=$lsfTop
-	docker run -idt --volumes-from nfs --name Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	isMC="N"
+	domain="$CLUSTER_NAME.com"
+	docker run -idt --volumes-from nfs --name Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
-	docker wait Install > /dev/null 2>$1
+	docker wait Install > /dev/null 2>&1
 	echo "LSF Installation Completed!"
 	rm -rf installdir
 
@@ -124,8 +126,6 @@ function funcBuildCluster() {
 	echo "DNS server is started"
 
 	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' dns-server`
-	isMasterNode="N"
-	isLastNode="N"
 	
 	# Provide hosts list for password-less ssh
 	if [ -e $SSH_AUTO/hosts.$CLUSTER_NAME ];then
@@ -139,28 +139,33 @@ function funcBuildCluster() {
 	# Build Cluster Nodes
 	
 	entrypointBuildLSF="$NFS/buildlsf.entrypoint.sh"
-	for i in `seq 1 $HOST_NUM`;do
+	for((i=1;i<=$HOST_NUM;i++)); do
 		j=$[$i-1]
 		if [ $i -eq 1 ]; then
-			isMasterNode="Y"
 			hostName=$LSF_MASTER_NAME
 		else 
 			hostName="slave$j"
 
 		fi
-		if [ $i -eq $HOST_NUM ]; then
-			isLastNode="Y"
-		fi
 
-		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from nfs --cap-add=SYS_PTRACE -e "IS_MASTER_NODE=$isMasterNode" -e "IS_LAST_NODE=$isLastNode" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "LOCK_FILE=$NFS/lockfile" -e "NO_GO=$NFS/nogo" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 		echo $hostName >> $SSH_AUTO/hosts.$CLUSTER_NAME
 		echo "Created LSF HOST: $hostName"
 
 		isMasterNode="N"
-		isLastNode=="N" 
+		isLastNode="N" 
 	done
+	
+	# Copy hosts file to shared NFS which can be accessed by each container
+	# The file is to feed ssh passwd-less function by getting all container host names
 	docker cp $SSH_AUTO/hosts.$CLUSTER_NAME nfs:$NFS/sshnopasswd
+	
+	# Start LSF in each container by sending signal SIGUSR1
+	for i in `cat $SSH_AUTO/hosts.$CLUSTER_NAME`; do
+		docker kill -s SIGUSR1 $i
+	done
+	
 	rm $SSH_AUTO/hosts.$CLUSTER_NAME
 }
 	
@@ -215,7 +220,7 @@ function funcBuildClusterMC() {
 			echo "Created LSF HOST: $hostName for cluster: $clusterName"
 
 			isMasterNode="N"
-			isLastNode=="N"
+			isLastNode="N"
 		done
 		docker cp $SSH_AUTO/hosts.$clusterName nfs:$NFS/sshnopasswd
 		rm $SSH_AUTO/hosts.$clusterName

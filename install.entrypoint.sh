@@ -31,3 +31,23 @@ sed -i '$a\LSF_TARDIR='"$LSF_TAR_DIR"'' $installFile
 /opt/install.exp $installFile
 
 
+# Configure LSF cluster after installation
+if [ $IS_MC = "N" ]; then
+	sed -i '$a\LSF_STRIP_DOMAIN='"$LSF_DOMAIN"'' $LSF_TOP/conf/lsf.conf
+	for((i=$HOST_NUM-1;i>=1;i--))
+	do
+		HOSTSTRING="slave$i  !   !   1   3.5   ()   ()   ()"
+		echo "$LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME" >> /opt/debug
+		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
+	done
+fi
+
+if [ $IS_MC = "Y" ]; then
+	echo "MC"
+
+fi
+
+
+
+
+
