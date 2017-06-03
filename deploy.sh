@@ -25,7 +25,7 @@ INSTALL_LOCK="$NFS.lockfile"
 # Otherwise copy relative files. cp for local and scp for remote. Put files at same dir. 
 
 function funcInitial() {
-	echo "Initial..."
+	echo "Initializing..."
 	productName=$1
 	version=$2
 	installPackageDir="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/OriginalPackage"
@@ -33,7 +33,7 @@ function funcInitial() {
 	# Logic to judge from  where to copy installation packages
 
 	cp -r $installPackageDir installdir
-	echo "Installtion Pckages are copied to $(pwd)/installdir"
+	echo -e "Installtion Pckages are copied to $(pwd)/installdir\n"
 }
 
 
@@ -44,14 +44,15 @@ function funcInitial() {
 # Share the dir which a user specifies. 
 
 function funcCreateNFS() {
-	echo "Create NFS node..."
-	docker run -v $NFS --name nfs ubuntu:17.04 echo "NFS node is created successfully!"
+	echo "Creating NFS node..."
+	docker run -v $NFS --name nfs ubuntu:17.04 echo "NFS" > /dev/null
 	docker cp $(pwd)/installdir nfs:$NFS
 	docker cp $(pwd)/install.entrypoint.sh nfs:$NFS
 	docker cp $(pwd)/install.exp nfs:$NFS
 	docker cp $(pwd)/sshnopasswd nfs:$NFS
 	docker cp $(pwd)/buildlsf.entrypoint.sh nfs:$NFS
 	export SSH_AUTO="$(pwd)/sshnopasswd"
+	echo -e "NFS node is created successfully!\n"
 }
 
 
@@ -65,7 +66,7 @@ function funcCreateNFS() {
 # 4. Exit after finishing installation
 
 function funcInstall() {
-	echo "Start Installation..."
+	echo "Starting Installation..."
 	# Standard LSF
 	lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
 	lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
@@ -82,18 +83,18 @@ function funcInstall() {
 	
 	# Block until the installation completes
 	docker wait Install > /dev/null 2>&1
-	echo "LSF Installation Completed!"
+	echo -e "LSF Installation Completed!\n"
 	rm -rf installdir
 
 }
 
 function funcInstallMC() {
-	echo "Start MC Installation..."
+	echo "Starting MC Installation..."
 	# Standard LSF
 	lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
 	lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
 	lsfInstallEntitlementFile="$NFS/installdir/platform_lsf_adv_entitlement.dat"
-	
+	domain="MC.com"
 	#Install LSF for each cluster
 	for((i=1;i<=$CLUSTER_NUM;i++))
 	do		
@@ -103,11 +104,13 @@ function funcInstallMC() {
 		lsfClusterName=c$i
 		lsfMasterName="c$i-master"
 		LSF_TOP=$lsfTop
-		docker run -idt --volumes-from nfs --name Install.$lsfClusterName -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		isMC="Y"
+		docker run -idt --volumes-from nfs --name Install.$lsfClusterName -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait Install.$lsfClusterName > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
 		rm -rf installdir
 	done
+	echo -e "\n"
 
 }
 
@@ -119,7 +122,7 @@ function funcInstallMC() {
 # Create user accounts, prepare environment and start cluster with entrypoint file
 
 function funcBuildCluster() {
-	echo "Build Cluster..."
+	echo "Building Cluster..."
 	domain=$CLUSTER_NAME.com
 	echo "Starting DNS Server"
 	docker run -d --name dns-server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
@@ -153,8 +156,6 @@ function funcBuildCluster() {
 		echo $hostName >> $SSH_AUTO/hosts.$CLUSTER_NAME
 		echo "Created LSF HOST: $hostName"
 
-		isMasterNode="N"
-		isLastNode="N" 
 	done
 	
 	# Copy hosts file to shared NFS which can be accessed by each container
@@ -163,7 +164,7 @@ function funcBuildCluster() {
 	
 	# Start LSF in each container by sending signal SIGUSR1
 	for i in `cat $SSH_AUTO/hosts.$CLUSTER_NAME`; do
-		docker kill -s SIGUSR1 $i
+		docker kill -s SIGUSR1 $i > /dev/null 2>&1
 	done
 	
 	rm $SSH_AUTO/hosts.$CLUSTER_NAME
@@ -172,7 +173,7 @@ function funcBuildCluster() {
 
 
 function funcBuildClusterMC() {
-	echo "Build MC Cluster..."
+	echo "Building MC Cluster..."
 	domain="MC.com"
 	echo "Starting DNS Server"
 	docker run -d --name dns-server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
@@ -181,10 +182,11 @@ function funcBuildClusterMC() {
 	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' dns-server`
 	
 	
+	hostList=""
+	
 	for((k=1;k<=$CLUSTER_NUM;k++))
 	do
-		isMasterNode="N"
-		isLastNode="N"
+		
 		clusterName="c$k"
 		lsfTop="$NFS/cluster$k"
 		LSF_TOP=$lsfTop
@@ -200,30 +202,33 @@ function funcBuildClusterMC() {
 		# Build Cluster Nodes
 	
 		entrypointBuildLSF="$NFS/buildlsf.entrypoint.sh"
+		#Record All host names and feed to docker kill -s SIGUSR1
 		for((i=1;i<=$HOST_NUM;i++))
 		do
 			j=$[$i-1]
 			if [ $i -eq 1 ]; then
-				isMasterNode="Y"
 				hostName="c$k-master"
 			else 
 				hostName="c$k-slave$j"
 
 			fi
-			if [ $i -eq $HOST_NUM ]; then
-				isLastNode="Y"
-			fi
 
-			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from nfs --cap-add=SYS_PTRACE -e "IS_MASTER_NODE=$isMasterNode" -e "IS_LAST_NODE=$isLastNode" -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "LOCK_FILE=$NFS/lockfile.$clusterName" -e "NO_GO=$NFS/nogo.$clusterName" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE 
+			hostList="$hostList $hostName"
+			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 			echo $hostName >> $SSH_AUTO/hosts.$clusterName
 			echo "Created LSF HOST: $hostName for cluster: $clusterName"
 
-			isMasterNode="N"
-			isLastNode="N"
 		done
 		docker cp $SSH_AUTO/hosts.$clusterName nfs:$NFS/sshnopasswd
 		rm $SSH_AUTO/hosts.$clusterName
+	done
+	
+	# Start each MC node
+
+	for i in $hostList
+	do
+		docker kill -s SIGUSR1 $i > /dev/null 2>&1
 	done
 }
 
@@ -356,27 +361,10 @@ function funcUserInteract() {
 			echo "Wrong Input. Exit!"
 			exit
 		;;
-	
-
-
-
-
 
 
 
 	esac
-
-
-
-
-
-
-
-
-
-
-
-
 	
 }
 
