@@ -12,6 +12,7 @@ CLUSTER_NUM="1"
 HOST_NUM=""
 NFS="/opt"
 IMAGE="ubuntu:17.04.v1"
+IMAGE4SAS="ubuntu:17.04.v2"
 INSTALL_PACKAGE_DIR="."
 INSTALL_LOCK="$NFS.lockfile"
 
@@ -36,6 +37,10 @@ function funcInitial() {
 	echo -e "Installtion Pckages are copied to $(pwd)/installdir\n"
 }
 
+function funcSASInitial() {
+	echo "SAS Initializing..."
+	export SAS_INSTALL_PACK="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/PPM/sas_pss9.1"
+}
 
 
 # NFS node creation 
@@ -49,6 +54,18 @@ function funcCreateNFS() {
 	docker cp $(pwd)/installdir nfs:$NFS
 	docker cp $(pwd)/install.entrypoint.sh nfs:$NFS
 	docker cp $(pwd)/install.exp nfs:$NFS
+	docker cp $(pwd)/sshnopasswd nfs:$NFS
+	docker cp $(pwd)/buildlsf.entrypoint.sh nfs:$NFS
+	export SSH_AUTO="$(pwd)/sshnopasswd"
+	echo -e "NFS node is created successfully!\n"
+}
+
+function funcSASCreateNFS() {
+	echo "SAS Creating NFS node..."
+	docker run -v $NFS --name nfs ubuntu:17.04 echo "NFS" > /dev/null
+	docker cp $SAS_INSTALL_PACK nfs:$NFS
+	docker cp $(pwd)/sasinstall.entrypoint.sh nfs:$NFS
+	docker cp $(pwd)/sasinstall.exp nfs:$NFS
 	docker cp $(pwd)/sshnopasswd nfs:$NFS
 	docker cp $(pwd)/buildlsf.entrypoint.sh nfs:$NFS
 	export SSH_AUTO="$(pwd)/sshnopasswd"
@@ -112,6 +129,27 @@ function funcInstallMC() {
 	done
 	echo -e "\n"
 
+}
+
+function funcSASInstall() {
+	echo "Starting SAS Installation..."
+	sasInstallPack="$NFS/sas_pss9.1/pm9.1.3.0_sas_lnx26-lib23-x64.tar"
+	sasInstallEntitlementFile="$NFS/sas_pss9.1/platform_lsf_adv_entitlement.dat"
+	sasInstallDir="$NFS/pm9.1.3.0_sas_pinstall"
+	isSAS="Y"
+	entryPointFile="$NFS/sasinstall.entrypoint.sh"
+	JS_TOP="$NFS/sas/pm9.1.3"
+	JS_HOST=master
+	JS_ADMINS=lsfadmin
+	LSF_INSTALL="true"
+	LSF_TOP="$NFS/sas/lsf9.1.3"
+	LSF_CLUSTER_NAME="sas"
+	LSF_MASTER_LIST="master"
+	#Input Env Vars: SAS_INSTALL_PACK SAS_INSTALL_ENTITLEMENT_FILE SAS_INSTALL_DIR IS_SAS
+	docker run -idt --volumes-from nfs --name Install -h $JS_HOST --cap-add=SYS_PTRACE -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$sasInstallDir" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS 
+
+
+	
 }
 
 
@@ -233,6 +271,12 @@ function funcBuildClusterMC() {
 }
 
 
+function funcSASBuild() {
+	echo "Building SAS Cluster..."
+	
+
+}
+
 
 
 # Export
@@ -277,9 +321,10 @@ function funcUserInteract() {
 	echo -e "2. Multiple Cluster"
 	echo -e "3. License Scheudler"
 	echo -e "4. Data Manager"
+	echo -e "5. SAS (LSF+PPM)"
 	read -p "Your choice:(1)" choice
 	choice=${choice:-1}
-	echo -e "$choice\n"
+	echo -e "$choice"
 	
 	case $choice in 
 		"1")
@@ -355,6 +400,13 @@ function funcUserInteract() {
 		
 		"4")
 			echo "Data Manager"
+		;;
+		
+		"5")
+			echo "SAS"
+			funcSASInitial
+			funcSASCreateNFS
+			funcSASInstall
 		;;
 
 		*)
