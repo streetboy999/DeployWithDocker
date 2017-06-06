@@ -3,7 +3,15 @@
 HOSTNAME=`hostname`
 USERNAME=`whoami`
 
-for user in root `ls /home`
+#for user in root `ls /home`
+# Considering the performance I only choose root to set ssh passwordless
+
+hostNum=`cat $(pwd)/hosts.$CLUSTER_NAME | wc -l`
+if [ $hostNum -gt 3 ]; then
+	exit
+fi
+
+for user in root
 do
 	if [ $user = "root" ]
 	then

@@ -67,7 +67,7 @@ function funcSASCreateNFS() {
 	docker cp $(pwd)/sasinstall.entrypoint.sh nfs:$NFS
 	docker cp $(pwd)/sasinstall.exp nfs:$NFS
 	docker cp $(pwd)/sshnopasswd nfs:$NFS
-	docker cp $(pwd)/buildlsf.entrypoint.sh nfs:$NFS
+	docker cp $(pwd)/buildsas.entrypoint.sh nfs:$NFS
 	export SSH_AUTO="$(pwd)/sshnopasswd"
 	echo -e "NFS node is created successfully!\n"
 }
@@ -133,21 +133,24 @@ function funcInstallMC() {
 
 function funcSASInstall() {
 	echo "Starting SAS Installation..."
+	hostNum=$1
 	sasInstallPack="$NFS/sas_pss9.1/pm9.1.3.0_sas_lnx26-lib23-x64.tar"
 	sasInstallEntitlementFile="$NFS/sas_pss9.1/platform_lsf_adv_entitlement.dat"
 	sasInstallDir="$NFS/pm9.1.3.0_sas_pinstall"
 	isSAS="Y"
 	entryPointFile="$NFS/sasinstall.entrypoint.sh"
-	JS_TOP="$NFS/sas/pm9.1.3"
+	export LSF_DOMAIN="sas.com"
+	export JS_TOP="$NFS/sas/pm9.1.3"
 	JS_HOST=master
 	JS_ADMINS=lsfadmin
 	LSF_INSTALL="true"
-	LSF_TOP="$NFS/sas/lsf9.1.3"
-	LSF_CLUSTER_NAME="sas"
+	export LSF_TOP="$NFS/sas/lsf9.1.3"
+	export LSF_CLUSTER_NAME="sas"
 	LSF_MASTER_LIST="master"
 	#Input Env Vars: SAS_INSTALL_PACK SAS_INSTALL_ENTITLEMENT_FILE SAS_INSTALL_DIR IS_SAS
-	docker run -idt --volumes-from nfs --name Install -h $JS_HOST --cap-add=SYS_PTRACE -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$sasInstallDir" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS 
-
+	docker run -idt --volumes-from nfs --name Install -h $JS_HOST --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$LSF_DOMAIN" -e "HOST_NUM=$hostNum" -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$sasInstallDir" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS >/dev/null 2>&1
+	docker wait Install > /dev/null 2>&1
+	echo -e "SAS (LSF+PM) Installation completed!\n"
 
 	
 }
@@ -273,7 +276,44 @@ function funcBuildClusterMC() {
 
 function funcSASBuild() {
 	echo "Building SAS Cluster..."
+	domain=$LSF_DOMAIN
+	echo "Starting DNS Server"
+	docker run -d --name dns-server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
+	echo "DNS server is started"
+
+	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' dns-server`
 	
+	hostList=""
+	clusterName=$LSF_CLUSTER_NAME
+	entrypointBuildSAS="$NFS/buildsas.entrypoint.sh"
+	echo "Open XQuartz"
+	open -a XQuartz
+	ip=$(ifconfig en0 | grep inet | awk '$1=="inet" {print $2}')
+	xhost + $ip 
+	hostNum=$1
+	for((i=1;i<=hostNum;i++))
+	do
+		j=$[$i-1]
+		if [ $i -eq 1 ]; then
+			hostName="master"
+			IS_JS_MASTER="Y"			
+		else 
+			hostName="slave$j"
+			IS_JS_MASTER="N"
+		fi
+		hostList="$hostList $hostName"
+		docker run -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null 2>&1
+		
+		echo $hostName >> $SSH_AUTO/hosts.$clusterName
+		echo "Created LSF HOST: $hostName"		
+	done
+	docker cp $SSH_AUTO/hosts.$clusterName nfs:$NFS/sshnopasswd
+	# Start SAS cluster
+	for i in $hostList
+	do
+		docker kill -s SIGUSR1 $i > /dev/null 2>&1
+	done	
+	rm $SSH_AUTO/hosts.$clusterName	
 
 }
 
@@ -315,13 +355,13 @@ function funcLog() {
 
 function funcUserInteract() {
 	echo "Start from here..."
-	echo -e "	Welcome to use the automatic IBM Spectrum LSF deployment tool!\n\n"
+	echo -e "	Welcome to use the automatic IBM Spectrum products deployment tool!\n\n"
 	echo -e "What products do you want to deploy:"
 	echo -e "1. LSF"
 	echo -e "2. Multiple Cluster"
-	echo -e "3. License Scheudler"
-	echo -e "4. Data Manager"
-	echo -e "5. SAS (LSF+PPM)"
+	echo -e "3. SAS (LSF+PPM)"
+	#echo -e "4. Data Manager"
+	#echo -e "5. License Scheudler"
 	read -p "Your choice:(1)" choice
 	choice=${choice:-1}
 	echo -e "$choice"
@@ -394,7 +434,7 @@ function funcUserInteract() {
 
 		;;
 		
-		"3")
+		"5")
 			echo "License Scheduler"
 		;;
 		
@@ -402,11 +442,14 @@ function funcUserInteract() {
 			echo "Data Manager"
 		;;
 		
-		"5")
-			echo "SAS"
+		"3")
+			read -p "How many hosts do you want to create?(2)" hostNum
+			hostNum=${hostNum:-2}
+			
 			funcSASInitial
 			funcSASCreateNFS
-			funcSASInstall
+			funcSASInstall $hostNum
+			funcSASBuild $hostNum
 		;;
 
 		*)

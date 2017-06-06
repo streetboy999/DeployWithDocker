@@ -12,4 +12,10 @@ expect {
 	"Press Enter to continue viewing the license agreement" {send "1\r"}
 	eof
 }
+
+spawn true
 expect eof
+catch wait result
+exit [lindex $result 3]
+
+
