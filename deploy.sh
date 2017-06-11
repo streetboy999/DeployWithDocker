@@ -31,10 +31,13 @@ function funcInitial() {
 	version=$2
 	installPackageDir="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/OriginalPackage"
 	
+	# Feed to patch installation function 
+	export LSF_PATCH_FILE="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/lsf9.1.3_linux2.6-glibc2.3-x86_64-441747.tar.Z"
+	
 	# Logic to judge from  where to copy installation packages
 
 	cp -r $installPackageDir installdir
-	echo -e "Installtion Pckages are copied to $(pwd)/installdir\n"
+	echo -e "Installtion Packages are copied to $(pwd)/installdir\n"
 }
 
 function funcSASInitial() {
@@ -56,6 +59,7 @@ function funcCreateNFS() {
 	docker cp $(pwd)/install.exp nfs:$NFS
 	docker cp $(pwd)/sshnopasswd nfs:$NFS
 	docker cp $(pwd)/buildlsf.entrypoint.sh nfs:$NFS
+	docker cp $(pwd)/patchinstall.entrypoint.sh nfs:$NFS
 	export SSH_AUTO="$(pwd)/sshnopasswd"
 	echo -e "NFS node is created successfully!\n"
 }
@@ -73,6 +77,32 @@ function funcSASCreateNFS() {
 }
 
 
+# Install LSF patch
+#
+# 	Input Paramasters: 
+# 	$1 LSF version: 9.1 or 10.1
+# 	$2 LSF patch file
+# 	$3 LSF TOP directory
+# 	$4 NFS directory
+# 	$5 LSF Master Name
+function funcPatch() {
+	echo "Staring to apply a patch..."
+	lsfVersion=$1
+	lsfPatchFile=$2
+	lsfTop=$3
+	nfs=$4
+	lsfMasterName=$5
+	patchName="patch.tar.Z"
+	entryPointFile="$nfs/patchinstall.entrypoint.sh"
+	
+	docker cp $lsfPatchFile nfs:$nfs/$patchName
+	
+	docker run -idt --volumes-from nfs --name PatchInstall -h $lsfMasterName -e "LSF_VERSION=$lsfVersion" -e "LSF_PATCH_FILE=$nfs/$patchName" -e "LSF_TOP=$lsfTop" -e "NFS=$nfs"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker wait PatchInstall > /dev/null 2>&1
+	echo -e "Patch Installation Completed!\n"
+	
+
+}
 
 # Installation
 #
@@ -102,6 +132,14 @@ function funcInstall() {
 	docker wait Install > /dev/null 2>&1
 	echo -e "LSF Installation Completed!\n"
 	rm -rf installdir
+	
+	needInstallPatch=$1
+	lsfVersion=$2
+	if [ $needInstallPatch = "y" ]; then
+		# Get the patch file from the env var of initialization 
+		lsfPatchFile=$LSF_PATCH_FILE
+		funcPatch $lsfVersion $lsfPatchFile $lsfTop $NFS $lsfMasterName
+	fi
 
 }
 
@@ -378,8 +416,12 @@ function funcUserInteract() {
 			version=${version:-1}
 			if [ $version = "1" ];then
 				LSF_VERSION=9.1.3
+				# To specify $LSF_TOP/<version>/
+				lsfVersion=9.1
 			elif [ $version = "2" ];then
 				LSF_VERSION=10.1
+				# To specify $LSF_TOP/<version>/
+				lsfVersion=10.1
 			else
 				echo "Wrong Input. Exit!"
 				exit
@@ -391,9 +433,13 @@ function funcUserInteract() {
 			hostNum=${hostNum:-5}
 			HOST_NUM=$hostNum
 			
+			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
+			needInstallPatch=${needInstallPatch:-"n"}
+			
 			funcInitial $PRODUCTS_NAME $LSF_VERSION
 			funcCreateNFS
-			funcInstall $PRODUCTS_NAME $CLUSTER_NAME $CLUSTER_NUMBER $HOST_NUM
+			#funcInstall $PRODUCTS_NAME $CLUSTER_NAME $CLUSTER_NUMBER $HOST_NUM
+			funcInstall $needInstallPatch $lsfVersion
 			funcBuildCluster
 
 		;;
