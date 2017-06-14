@@ -15,6 +15,7 @@ if [ $IS_SAS = "Y" ]; then
 	
 	#
 	tar -xvf $SAS_INSTALL_PACK -C $NFS
+	sleep 1
 	cp $SAS_INSTALL_ENTITLEMENT_FILE $SAS_INSTALL_DIR/license.dat
 	cd $SAS_INSTALL_DIR
 	cp install.config install.config.bak
@@ -35,7 +36,7 @@ if [ $IS_SAS = "Y" ]; then
 	
 	$NFS/sasinstall.exp install.config
 	
-	sleep 10
+	sleep 15
 	
 	
 	# Configure LSF cluster

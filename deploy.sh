@@ -16,7 +16,37 @@ IMAGE4SAS="ubuntu:17.04.v2"
 INSTALL_PACKAGE_DIR="."
 INSTALL_LOCK="$NFS.lockfile"
 
+# You need to put the necessary LSF installation files in the direcotry below. The files include
+# <lsf_version>_lsfinstall_linux_x86_64.tar.Z
+# <lsf_version>_linux2.6-glibc2.3-x86_64.tar.Z
+# entitlement file
+INSTALL_PACKAGE_DIR_FOR_LSF913=""
+INSTALL_PACKAGE_DIR_FOR_LSF101=""
+INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=""
+
+
+# LSF spk files directory
+SPK_DIR_FOR_LSF913=""
+SPK_DIR_FOR_LSF101=""
+
+# The image file that you choose to create docker containers
+IMAGE=""
+IMAGE4SAS=""
+
+# ContainerID file
+CONFIGURE_LSF_FILE="./configure.lsf"
+CONTAINER_ID_FILE="./container.id"
+ID=1
+
+
+
 ## Functions ##
+
+function ID++(){
+   ((ID++))
+   	echo $ID > $CONTAINER_ID_FILE
+   	export ID
+}
 
 
 # Initialization 
@@ -27,22 +57,53 @@ INSTALL_LOCK="$NFS.lockfile"
 
 function funcInitial() {
 	echo "Initializing..."
+	
+	# Export all necessary environment variables and get the 
+	. $CONFIGURE_LSF_FILE
+	
+	# Check if the ID file exists. If yes, get it and add 1. If not, set it to 1
+	if [ -e $CONTAINER_ID_FILE ]; then
+		ID=`cat $CONTAINER_ID_FILE`
+		ID++
+	else
+		ID=0
+		ID++
+	fi
+	
+	
 	productName=$1
 	version=$2
-	installPackageDir="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/OriginalPackage"
+	
+	#installPackageDir="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/OriginalPackage"
+	installPackageDir=$INSTALL_PACKAGE_DIR_FOR_LSF913
 	
 	# Feed to patch installation function 
-	export LSF_PATCH_FILE="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/lsf9.1.3_linux2.6-glibc2.3-x86_64-441747.tar.Z"
+	LSF_PATCH_FILE=`ls $SPK_DIR_FOR_LSF913`
+	LSF_PATCH_FILE="$SPK_DIR_FOR_LSF913/$LSF_PATCH_FILE"
+	export LSF_PATCH_FILE #="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/lsf9.1.3_linux2.6-glibc2.3-x86_64-441747.tar.Z"
 	
 	# Logic to judge from  where to copy installation packages
-
-	cp -r $installPackageDir installdir
-	echo -e "Installtion Packages are copied to $(pwd)/installdir\n"
+	ln -s $installPackageDir installdir
+	#cp -r $installPackageDir installdir
+	echo -e "Installtion Packages are linked to $(pwd)/installdir\n"
 }
 
 function funcSASInitial() {
 	echo "SAS Initializing..."
-	export SAS_INSTALL_PACK="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/PPM/sas_pss9.1"
+		# Export all necessary environment variables and get the 
+	. $CONFIGURE_LSF_FILE
+	
+	# Check if the ID file exists. If yes, get it and add 1. If not, set it to 1
+	if [ -e $CONTAINER_ID_FILE ]; then
+		ID=`cat $CONTAINER_ID_FILE`
+		ID++
+		echo "ID=$ID"
+	else
+		ID=0
+		ID++
+		echo "ID=$ID"
+	fi
+	export SAS_INSTALL_PACK=$INSTALL_PACKAGE_DIR_FOR_SAS_PSS91 #"/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/PPM/sas_pss9.1"
 }
 
 
@@ -53,25 +114,27 @@ function funcSASInitial() {
 
 function funcCreateNFS() {
 	echo "Creating NFS node..."
-	docker run -v $NFS --name nfs ubuntu:17.04 echo "NFS" > /dev/null
-	docker cp $(pwd)/installdir nfs:$NFS
-	docker cp $(pwd)/install.entrypoint.sh nfs:$NFS
-	docker cp $(pwd)/install.exp nfs:$NFS
-	docker cp $(pwd)/sshnopasswd nfs:$NFS
-	docker cp $(pwd)/buildlsf.entrypoint.sh nfs:$NFS
-	docker cp $(pwd)/patchinstall.entrypoint.sh nfs:$NFS
+	export nfs="NFS_$ID"
+	docker run -v $NFS --name $nfs $IMAGE echo "NFS_$ID" > /dev/null
+	docker cp -L $(pwd)/installdir $nfs:$NFS
+	docker cp $(pwd)/install.entrypoint.sh $nfs:$NFS
+	docker cp $(pwd)/install.exp $nfs:$NFS
+	docker cp $(pwd)/sshnopasswd $nfs:$NFS
+	docker cp $(pwd)/buildlsf.entrypoint.sh $nfs:$NFS
+	docker cp $(pwd)/patchinstall.entrypoint.sh $nfs:$NFS
 	export SSH_AUTO="$(pwd)/sshnopasswd"
 	echo -e "NFS node is created successfully!\n"
 }
 
 function funcSASCreateNFS() {
 	echo "SAS Creating NFS node..."
-	docker run -v $NFS --name nfs ubuntu:17.04 echo "NFS" > /dev/null
-	docker cp $SAS_INSTALL_PACK nfs:$NFS
-	docker cp $(pwd)/sasinstall.entrypoint.sh nfs:$NFS
-	docker cp $(pwd)/sasinstall.exp nfs:$NFS
-	docker cp $(pwd)/sshnopasswd nfs:$NFS
-	docker cp $(pwd)/buildsas.entrypoint.sh nfs:$NFS
+	export nfs="NFS_$ID"
+	docker run -v $NFS --name $nfs $IMAGE4SAS echo "NFS_$ID" > /dev/null
+	docker cp $SAS_INSTALL_PACK $nfs:$NFS
+	docker cp $(pwd)/sasinstall.entrypoint.sh $nfs:$NFS
+	docker cp $(pwd)/sasinstall.exp $nfs:$NFS
+	docker cp $(pwd)/sshnopasswd $nfs:$NFS
+	docker cp $(pwd)/buildsas.entrypoint.sh $nfs:$NFS
 	export SSH_AUTO="$(pwd)/sshnopasswd"
 	echo -e "NFS node is created successfully!\n"
 }
@@ -90,15 +153,16 @@ function funcPatch() {
 	lsfVersion=$1
 	lsfPatchFile=$2
 	lsfTop=$3
-	nfs=$4
+	nfsDir=$4
 	lsfMasterName=$5
 	patchName="patch.tar.Z"
-	entryPointFile="$nfs/patchinstall.entrypoint.sh"
+	entryPointFile="$nfsDir/patchinstall.entrypoint.sh"
 	
-	docker cp $lsfPatchFile nfs:$nfs/$patchName
+	docker cp $lsfPatchFile $nfs:$nfsDir/$patchName
 	
-	docker run -idt --volumes-from nfs --name PatchInstall -h $lsfMasterName -e "LSF_VERSION=$lsfVersion" -e "LSF_PATCH_FILE=$nfs/$patchName" -e "LSF_TOP=$lsfTop" -e "NFS=$nfs"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
-	docker wait PatchInstall > /dev/null 2>&1
+	PatchInstall="PatchInstall_$ID"
+	docker run -idt --volumes-from $nfs --name $PatchInstall -h $lsfMasterName -e "LSF_VERSION=$lsfVersion" -e "LSF_PATCH_FILE=$nfsDir/$patchName" -e "LSF_TOP=$lsfTop" -e "NFS=$nfsDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker wait $PatchInstall > /dev/null 2>&1
 	echo -e "Patch Installation Completed!\n"
 	
 
@@ -115,23 +179,37 @@ function funcPatch() {
 function funcInstall() {
 	echo "Starting Installation..."
 	# Standard LSF
-	lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
-	lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
-	lsfInstallEntitlementFile="$NFS/installdir/platform_lsf_adv_entitlement.dat"
+	lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep install`
+	lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	
+	lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
+	lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	
+	lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
+	lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
+		
+	#lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
+	#lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
+	#lsfInstallEntitlementFile="$NFS/installdir/platform_lsf_adv_entitlement.dat"
+	
+	
+	
 	lsfTop="$NFS/cluster"
 	lsfTarDir="$NFS/installdir"
 	entryPointFile="$NFS/install.entrypoint.sh"
 	lsfClusterName=$CLUSTER_NAME
-	lsfMasterName="master"
+	export lsfMasterName="master_$ID"
 	LSF_TOP=$lsfTop
 	isMC="N"
-	domain="$CLUSTER_NAME.com"
-	docker run -idt --volumes-from nfs --name Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	domain="$CLUSTER_NAME$ID.com"
+	Install="Install_$ID"
+	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
-	docker wait Install > /dev/null 2>&1
+	docker wait $Install > /dev/null 2>&1
 	echo -e "LSF Installation Completed!\n"
-	rm -rf installdir
+	#rm -rf installdir
+	unlink installdir
 	
 	needInstallPatch=$1
 	lsfVersion=$2
@@ -146,10 +224,23 @@ function funcInstall() {
 function funcInstallMC() {
 	echo "Starting MC Installation..."
 	# Standard LSF
-	lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
-	lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
-	lsfInstallEntitlementFile="$NFS/installdir/platform_lsf_adv_entitlement.dat"
-	domain="MC.com"
+	#lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
+	#lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
+	#lsfInstallEntitlementFile="$NFS/installdir/platform_lsf_adv_entitlement.dat"
+	lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep install`
+	lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	
+	lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
+	lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	
+	lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
+	lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
+	
+	domain="MC${ID}.com"
+	
+	needInstallPatch=$1
+	lsfVersion=$2
+		
 	#Install LSF for each cluster
 	for((i=1;i<=$CLUSTER_NUM;i++))
 	do		
@@ -157,14 +248,17 @@ function funcInstallMC() {
 		lsfTarDir="$NFS/installdir"
 		entryPointFile="$NFS/install.entrypoint.sh"
 		lsfClusterName=c$i
-		lsfMasterName="c$i-master"
+		lsfMasterName="c$i-master_$ID"
 		LSF_TOP=$lsfTop
 		isMC="Y"
-		docker run -idt --volumes-from nfs --name Install.$lsfClusterName -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
-		docker wait Install.$lsfClusterName > /dev/null 2>&1
+		Install="Install.${lsfClusterName}_$ID"
+		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
-		rm -rf installdir
+		#rm -rf installdir
+		
 	done
+	unlink installdir
 	echo -e "\n"
 
 }
@@ -186,7 +280,7 @@ function funcSASInstall() {
 	export LSF_CLUSTER_NAME="sas"
 	LSF_MASTER_LIST="master"
 	#Input Env Vars: SAS_INSTALL_PACK SAS_INSTALL_ENTITLEMENT_FILE SAS_INSTALL_DIR IS_SAS
-	docker run -idt --volumes-from nfs --name Install -h $JS_HOST --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$LSF_DOMAIN" -e "HOST_NUM=$hostNum" -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$sasInstallDir" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS >/dev/null 2>&1
+	docker run -idt --volumes-from $nfs --name Install -h $JS_HOST --cap-add=SYS_PTRACE -e "LSF_DOMAIN=$LSF_DOMAIN" -e "HOST_NUM=$hostNum" -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$sasInstallDir" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS >/dev/null 2>&1
 	docker wait Install > /dev/null 2>&1
 	echo -e "SAS (LSF+PM) Installation completed!\n"
 
@@ -202,12 +296,15 @@ function funcSASInstall() {
 
 function funcBuildCluster() {
 	echo "Building Cluster..."
-	domain=$CLUSTER_NAME.com
+	domain="${CLUSTER_NAME}${ID}.com"
+	echo "domain=$domain"
+	#sleep 10
 	echo "Starting DNS Server"
-	docker run -d --name dns-server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
+	dns_server="dns-server_$ID"
+	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
-	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' dns-server`
+	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $dns_server`
 	
 	# Provide hosts list for password-less ssh
 	if [ -e $SSH_AUTO/hosts.$CLUSTER_NAME ];then
@@ -224,13 +321,13 @@ function funcBuildCluster() {
 	for((i=1;i<=$HOST_NUM;i++)); do
 		j=$[$i-1]
 		if [ $i -eq 1 ]; then
-			hostName=$LSF_MASTER_NAME
+			hostName=$lsfMasterName
 		else 
-			hostName="slave$j"
+			hostName="slave${j}_$ID"
 
 		fi
-
-		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+		#hostName="${hostName}_$ID"
+		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 		echo $hostName >> $SSH_AUTO/hosts.$CLUSTER_NAME
 		echo "Created LSF HOST: $hostName"
@@ -239,7 +336,7 @@ function funcBuildCluster() {
 	
 	# Copy hosts file to shared NFS which can be accessed by each container
 	# The file is to feed ssh passwd-less function by getting all container host names
-	docker cp $SSH_AUTO/hosts.$CLUSTER_NAME nfs:$NFS/sshnopasswd
+	docker cp $SSH_AUTO/hosts.$CLUSTER_NAME $nfs:$NFS/sshnopasswd
 	
 	# Start LSF in each container by sending signal SIGUSR1
 	for i in `cat $SSH_AUTO/hosts.$CLUSTER_NAME`; do
@@ -253,12 +350,13 @@ function funcBuildCluster() {
 
 function funcBuildClusterMC() {
 	echo "Building MC Cluster..."
-	domain="MC.com"
+	domain="MC${ID}.com"
 	echo "Starting DNS Server"
-	docker run -d --name dns-server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
+	dns_server="dns-server_$ID"
+	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
-	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' dns-server`
+	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $dns_server`
 	
 	
 	hostList=""
@@ -291,15 +389,15 @@ function funcBuildClusterMC() {
 				hostName="c$k-slave$j"
 
 			fi
-
+			hostName="${hostName}_$ID"
 			hostList="$hostList $hostName"
-			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 			echo $hostName >> $SSH_AUTO/hosts.$clusterName
 			echo "Created LSF HOST: $hostName for cluster: $clusterName"
 
 		done
-		docker cp $SSH_AUTO/hosts.$clusterName nfs:$NFS/sshnopasswd
+		docker cp $SSH_AUTO/hosts.$clusterName $nfs:$NFS/sshnopasswd
 		rm $SSH_AUTO/hosts.$clusterName
 	done
 	
@@ -340,12 +438,12 @@ function funcSASBuild() {
 			IS_JS_MASTER="N"
 		fi
 		hostList="$hostList $hostName"
-		docker run -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null 2>&1
+		docker run -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from $nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null 2>&1
 		
 		echo $hostName >> $SSH_AUTO/hosts.$clusterName
 		echo "Created LSF HOST: $hostName"		
 	done
-	docker cp $SSH_AUTO/hosts.$clusterName nfs:$NFS/sshnopasswd
+	docker cp $SSH_AUTO/hosts.$clusterName $nfs:$NFS/sshnopasswd
 	# Start SAS cluster
 	for i in $hostList
 	do
@@ -471,9 +569,12 @@ function funcUserInteract() {
 			hNum=${hNum:-2}
 			HOST_NUM=$hNum
 			
+			#read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
+			#needInstallPatch=${needInstallPatch:-"n"}
+			
 			funcInitial $PRODUCTS_NAME $LSF_VERSION
 			funcCreateNFS
-			funcInstallMC
+			funcInstallMC $needInstallPatch $lsfVersion
 			funcBuildClusterMC
 
 
@@ -509,7 +610,19 @@ function funcUserInteract() {
 	
 }
 
+while [ true ];do
+	if [ -e ./.lockfile ];then
+		echo "Someone is running the tool in parallel. Please wait..."
+		sleep 10		
+	else
+		touch ./.lockfile	
+		break
+	fi
+done
+
 funcUserInteract
+
+rm -rf ./.lockfile
 
 
 

@@ -36,7 +36,7 @@ if [ $IS_MC = "N" ]; then
 	sed -i '$a\LSF_STRIP_DOMAIN='"$LSF_DOMAIN"'' $LSF_TOP/conf/lsf.conf
 	for((i=$HOST_NUM-1;i>=1;i--))
 	do
-		HOSTSTRING="slave$i  !   !   1   3.5   ()   ()   ()"
+		HOSTSTRING="slave${i}_$ID  !   !   1   3.5   ()   ()   ()"
 		echo "$LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME" >> /opt/debug
 		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
 	done
@@ -50,7 +50,7 @@ if [ $IS_MC = "Y" ]; then
 	# lsf.cluster
 	for((i=$HOST_NUM-1;i>=1;i--))
 	do
-		HOSTSTRING="$LSF_CLUSTER_NAME-slave$i  !   !   1   3.5   ()   ()   ()"
+		HOSTSTRING="$LSF_CLUSTER_NAME-slave${i}_$ID  !   !   1   3.5   ()   ()   ()"
 		echo "$LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME" >> /opt/debug
 		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
 	done	
@@ -69,7 +69,7 @@ if [ $IS_MC = "Y" ]; then
 	sed -i "/Begin Cluster/a $TITLE" $LSF_SHARED
 	for((i=$LSF_CLUSTER_NUM;i>=1;i--))
 	do		
-		CLUSTER_SERVER="c$i              c$i-master"
+		CLUSTER_SERVER="c$i              c$i-master_$ID"
 		sed -i "/ClusterName/a $CLUSTER_SERVER" $LSF_SHARED
 	done
 	
