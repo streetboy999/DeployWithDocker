@@ -114,8 +114,8 @@ function funcSASInitial() {
 
 function funcCreateNFS() {
 	echo "Creating NFS node..."
-	export nfs="NFS_$ID"
-	docker run -v $NFS --name $nfs $IMAGE echo "NFS_$ID" > /dev/null
+	export nfs="NFS-id$ID"
+	docker run -v $NFS --name $nfs $IMAGE echo "NFS-id$ID" > /dev/null
 	docker cp -L $(pwd)/installdir $nfs:$NFS
 	docker cp $(pwd)/install.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/install.exp $nfs:$NFS
@@ -128,8 +128,8 @@ function funcCreateNFS() {
 
 function funcSASCreateNFS() {
 	echo "SAS Creating NFS node..."
-	export nfs="NFS_$ID"
-	docker run -v $NFS --name $nfs $IMAGE4SAS echo "NFS_$ID" > /dev/null
+	export nfs="NFS-id$ID"
+	docker run -v $NFS --name $nfs $IMAGE4SAS echo "NFS-id$ID" > /dev/null
 	docker cp $SAS_INSTALL_PACK $nfs:$NFS
 	docker cp $(pwd)/sasinstall.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/sasinstall.exp $nfs:$NFS
@@ -149,7 +149,7 @@ function funcSASCreateNFS() {
 # 	$4 NFS directory
 # 	$5 LSF Master Name
 function funcPatch() {
-	echo "Staring to apply a patch..."
+	echo "Starting to apply a patch..."
 	lsfVersion=$1
 	lsfPatchFile=$2
 	lsfTop=$3
@@ -160,7 +160,7 @@ function funcPatch() {
 	
 	docker cp $lsfPatchFile $nfs:$nfsDir/$patchName
 	
-	PatchInstall="PatchInstall_$ID"
+	PatchInstall="PatchInstall-id$ID"
 	docker run -idt --volumes-from $nfs --name $PatchInstall -h $lsfMasterName -e "LSF_VERSION=$lsfVersion" -e "LSF_PATCH_FILE=$nfsDir/$patchName" -e "LSF_TOP=$lsfTop" -e "NFS=$nfsDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	docker wait $PatchInstall > /dev/null 2>&1
 	echo -e "Patch Installation Completed!\n"
@@ -198,11 +198,11 @@ function funcInstall() {
 	lsfTarDir="$NFS/installdir"
 	entryPointFile="$NFS/install.entrypoint.sh"
 	lsfClusterName=$CLUSTER_NAME
-	export lsfMasterName="master_$ID"
+	export lsfMasterName="master-id$ID"
 	LSF_TOP=$lsfTop
 	isMC="N"
 	domain="$CLUSTER_NAME$ID.com"
-	Install="Install_$ID"
+	Install="Install-id$ID"
 	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
@@ -248,10 +248,10 @@ function funcInstallMC() {
 		lsfTarDir="$NFS/installdir"
 		entryPointFile="$NFS/install.entrypoint.sh"
 		lsfClusterName=c$i
-		lsfMasterName="c$i-master_$ID"
+		lsfMasterName="c$i-master-id$ID"
 		LSF_TOP=$lsfTop
 		isMC="Y"
-		Install="Install.${lsfClusterName}_$ID"
+		Install="Install.${lsfClusterName}-id$ID"
 		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
@@ -297,10 +297,9 @@ function funcSASInstall() {
 function funcBuildCluster() {
 	echo "Building Cluster..."
 	domain="${CLUSTER_NAME}${ID}.com"
-	echo "domain=$domain"
 	#sleep 10
 	echo "Starting DNS Server"
-	dns_server="dns-server_$ID"
+	dns_server="dns-server-id$ID"
 	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
@@ -323,10 +322,10 @@ function funcBuildCluster() {
 		if [ $i -eq 1 ]; then
 			hostName=$lsfMasterName
 		else 
-			hostName="slave${j}_$ID"
+			hostName="slave${j}-id$ID"
 
 		fi
-		#hostName="${hostName}_$ID"
+		#hostName="${hostName}-id$ID"
 		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 		echo $hostName >> $SSH_AUTO/hosts.$CLUSTER_NAME
@@ -352,7 +351,7 @@ function funcBuildClusterMC() {
 	echo "Building MC Cluster..."
 	domain="MC${ID}.com"
 	echo "Starting DNS Server"
-	dns_server="dns-server_$ID"
+	dns_server="dns-server-id$ID"
 	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
@@ -389,7 +388,7 @@ function funcBuildClusterMC() {
 				hostName="c$k-slave$j"
 
 			fi
-			hostName="${hostName}_$ID"
+			hostName="${hostName}-id$ID"
 			hostList="$hostList $hostName"
 			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
@@ -490,7 +489,6 @@ function funcLog() {
 # It has two ways: 1. Interactive 2. CLI
 
 function funcUserInteract() {
-	echo "Start from here..."
 	echo -e "	Welcome to use the automatic IBM Spectrum products deployment tool!\n\n"
 	echo -e "What products do you want to deploy:"
 	echo -e "1. LSF"
