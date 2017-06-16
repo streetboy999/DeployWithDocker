@@ -5,13 +5,13 @@
 # <lsf_version>_linux2.6-glibc2.3-x86_64.tar.Z
 # entitlement file
 INSTALL_PACKAGE_DIR_FOR_LSF913="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/OriginalPackage"
-INSTALL_PACKAGE_DIR_FOR_LSF101=""
+INSTALL_PACKAGE_DIR_FOR_LSF101="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF10.1/OriginalPakcage"
 INSTALL_PACKAGE_DIR_FOR_SAS_PSS91="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/PPM/sas_pss9.1"
 
 
 # LSF spk files directory
 SPK_DIR_FOR_LSF913="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/"
-SPK_DIR_FOR_LSF101=""
+SPK_DIR_FOR_LSF101="/Users/cwwu/Docker/Project/P2-AutoInstall/Raw_Packages/LSF10.1/SPK/spk2"
 
 
 

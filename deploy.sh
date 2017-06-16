@@ -42,10 +42,43 @@ ID=1
 
 ## Functions ##
 
+# ID and ID file to prevent two or more users run the tool in parallel
 function ID++(){
    ((ID++))
    	echo $ID > $CONTAINER_ID_FILE
    	export ID
+}
+
+
+# Clean function
+# Remove lock file if the tool exits
+function funcClean() {
+	echo -e "\nCleaning..."
+	if [ -e $(pwd)/.lockfile ]; then
+		rm $(pwd)/.lockfile
+		if [ $? -eq 0 ]; then
+			echo "Released lock file"
+		fi
+	fi
+	if [ -L "installdir" ]; then
+		unlink installdir
+		echo "Unlinked installdir"
+	fi
+	echo "Cleaning completed!"
+}
+
+# Customize the EXIT function and can define the user's own operations before exit
+function EXIT() {
+	funcClean
+	#echo -e "Exit...\n"
+	exit
+}
+
+# If the user press Ctrl+C, get the tool exited and clean up the lock file
+function funcTrapInt
+{
+	echo -e "\nRecieve signal INT and quit!"
+	EXIT
 }
 
 
@@ -68,24 +101,40 @@ function funcInitial() {
 	else
 		ID=0
 		ID++
-	fi
-	
+	fi	
 	
 	productName=$1
 	version=$2
+
+	case $version in 
+			"9.1.3")
+
+					installPackageDir=$INSTALL_PACKAGE_DIR_FOR_LSF913
 	
-	#installPackageDir="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/OriginalPackage"
-	installPackageDir=$INSTALL_PACKAGE_DIR_FOR_LSF913
+					# Feed to patch installation function 
+					LSF_PATCH_FILE=`ls $SPK_DIR_FOR_LSF913`
+					LSF_PATCH_FILE="$SPK_DIR_FOR_LSF913/$LSF_PATCH_FILE"
+			;;
+			
+			"10.1")
+					installPackageDir=$INSTALL_PACKAGE_DIR_FOR_LSF101
+					LSF_PATCH_FILE=`ls $SPK_DIR_FOR_LSF101`
+					LSF_PATCH_FILE="$SPK_DIR_FOR_LSF101/$LSF_PATCH_FILE"
+			;;
+			
+			*)
+					echo "Wrong Version!"
+					EXIT
+			;;
+	esac
 	
-	# Feed to patch installation function 
-	LSF_PATCH_FILE=`ls $SPK_DIR_FOR_LSF913`
-	LSF_PATCH_FILE="$SPK_DIR_FOR_LSF913/$LSF_PATCH_FILE"
 	export LSF_PATCH_FILE #="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/lsf9.1.3_linux2.6-glibc2.3-x86_64-441747.tar.Z"
 	
 	# Logic to judge from  where to copy installation packages
 	ln -s $installPackageDir installdir
+	echo -e "Initializing Completed!\n"
 	#cp -r $installPackageDir installdir
-	echo -e "Installtion Packages are linked to $(pwd)/installdir\n"
+	#echo -e "Installtion Packages are linked to $(pwd)/installdir\n"
 }
 
 function funcSASInitial() {
@@ -175,18 +224,44 @@ function funcPatch() {
 # 2. Start installation container
 # 3. Launch entrypoint script to install in the container
 # 4. Exit after finishing installation
+# Input Parameters:
+# needInstallPatch (y or n) 
+# lsfVersion (9.1 or 10.1)
 
 function funcInstall() {
 	echo "Starting Installation..."
 	# Standard LSF
-	lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep install`
-	lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	needInstallPatch=$1
+	lsfVersion=$2
 	
-	lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
-	lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	case $lsfVersion in 
+			"9.1")
+					
 	
-	lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
-	lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
+					lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep install`
+					lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	
+					lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
+					lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	
+					lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
+					lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
+			;;
+			"10.1")
+					lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep install`
+					lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	
+					lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep glibc`
+					lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	
+					lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep entitlement`
+					lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"					
+			;;
+			*)
+					echo "Wrong version!"
+					EXIT
+			;;
+	esac
 		
 	#lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
 	#lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
@@ -203,7 +278,7 @@ function funcInstall() {
 	isMC="N"
 	domain="$CLUSTER_NAME$ID.com"
 	Install="Install-id$ID"
-	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
 	docker wait $Install > /dev/null 2>&1
@@ -211,8 +286,7 @@ function funcInstall() {
 	#rm -rf installdir
 	unlink installdir
 	
-	needInstallPatch=$1
-	lsfVersion=$2
+
 	if [ $needInstallPatch = "y" ]; then
 		# Get the patch file from the env var of initialization 
 		lsfPatchFile=$LSF_PATCH_FILE
@@ -227,19 +301,40 @@ function funcInstallMC() {
 	#lsfInstallScriptFile="$NFS/installdir/lsf9.1.3_lsfinstall_linux_x86_64.tar.Z"
 	#lsfInstallBinaryfile="$NFS/installdir/lsf9.1.3_linux2.6-glibc2.3-x86_64.tar.Z"
 	#lsfInstallEntitlementFile="$NFS/installdir/platform_lsf_adv_entitlement.dat"
-	lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep install`
-	lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
-	
-	lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
-	lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
-	
-	lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
-	lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
-	
-	domain="MC${ID}.com"
 	
 	needInstallPatch=$1
 	lsfVersion=$2
+	
+	case $lsfVersion in 
+			"9.1")
+					
+	
+					lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep install`
+					lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	
+					lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
+					lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	
+					lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
+					lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
+			;;
+			"10.1")
+					lsfInstallScriptFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep install`
+					lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
+	
+					lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep glibc`
+					lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+	
+					lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep entitlement`
+					lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"					
+			;;
+			*)
+					echo "Wrong version!"
+					EXIT
+			;;
+	esac
+	
+	domain="MC${ID}.com"
 		
 	#Install LSF for each cluster
 	for((i=1;i<=$CLUSTER_NUM;i++))
@@ -252,11 +347,16 @@ function funcInstallMC() {
 		LSF_TOP=$lsfTop
 		isMC="Y"
 		Install="Install.${lsfClusterName}-id$ID"
-		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
-		#rm -rf installdir
 		
+		#Install patch for each cluster
+		if [ $needInstallPatch = "y" ]; then
+			# Get the patch file from the env var of initialization 
+			lsfPatchFile=$LSF_PATCH_FILE
+			funcPatch $lsfVersion $lsfPatchFile $lsfTop $NFS $lsfMasterName
+		fi
 	done
 	unlink installdir
 	echo -e "\n"
@@ -520,7 +620,7 @@ function funcUserInteract() {
 				lsfVersion=10.1
 			else
 				echo "Wrong Input. Exit!"
-				exit
+				EXIT
 			fi
 			read -p "Input Cluster Name:(mycluster)" clusterName
 			clusterName=${clusterName:-"mycluster"}
@@ -542,6 +642,7 @@ function funcUserInteract() {
 		
 		"2")
 			echo "Multiple Cluster"
+			PRODUCTS_NAME="MC"
 			echo -e "Choose LSF version:\n"
 			echo -e "1. LSF9.1.3\n"
 			echo -e "2. LSF10.1\n"
@@ -549,27 +650,28 @@ function funcUserInteract() {
 			version=${version:-1}
 			if [ $version = "1" ];then
 				LSF_VERSION=9.1.3
+				lsfVersion=9.1
 			elif [ $version = "2" ];then
 				LSF_VERSION=10.1
+				lsfVersion=10.1
 			else
 				echo "Wrong Input. Exit!"
-				exit
+				EXIT
 			fi
 
 			read -p "How many clusters do you want to create?:(4)" cNum
 			cNum=${cNum:-4}
 			if [ $cNum -lt 2 ]; then
 				echo -e "The smallest number of clusters is 2!\n"
-				exit
+				EXIT
 			fi
 			CLUSTER_NUM=$cNum
 			read -p "How many nodes in each cluster?:(2)" hNum
 			hNum=${hNum:-2}
 			HOST_NUM=$hNum
 			
-			#read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
-			#needInstallPatch=${needInstallPatch:-"n"}
-			
+			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
+			needInstallPatch=${needInstallPatch:-"n"}
 			funcInitial $PRODUCTS_NAME $LSF_VERSION
 			funcCreateNFS
 			funcInstallMC $needInstallPatch $lsfVersion
@@ -599,7 +701,7 @@ function funcUserInteract() {
 
 		*)
 			echo "Wrong Input. Exit!"
-			exit
+			EXIT
 		;;
 
 
@@ -607,6 +709,8 @@ function funcUserInteract() {
 	esac
 	
 }
+
+trap funcTrapInt SIGINT
 
 while [ true ];do
 	if [ -e ./.lockfile ];then
@@ -619,8 +723,7 @@ while [ true ];do
 done
 
 funcUserInteract
-
-rm -rf ./.lockfile
+funcClean
 
 
 

@@ -2,7 +2,8 @@
 
 ### Run in a docker container to install LSF ###
 tar -zxvf $LSF_INSTALL_SCRIPT_FILE
-cd $(pwd)/lsf9.1.3_lsfinstall
+#cd $(pwd)/lsf9.1.3_lsfinstall
+cd $(pwd)/*lsfinstall
 #cp install.config install.config.bak
 
 # Create lsfadmin
@@ -36,8 +37,12 @@ if [ $IS_MC = "N" ]; then
 	sed -i '$a\LSF_STRIP_DOMAIN='"$LSF_DOMAIN"'' $LSF_TOP/conf/lsf.conf
 	for((i=$HOST_NUM-1;i>=1;i--))
 	do
-		HOSTSTRING="slave${i}-id$ID  !   !   1   3.5   ()   ()   ()"
-		echo "$LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME" >> /opt/debug
+		#LSF9 and LSF10 have different formats of HOSTS section in lsf.cluster 
+		if [ $LSF_VERSION = "9.1" ]; then
+			HOSTSTRING="slave${i}-id$ID  !   !   1   3.5   ()   ()   ()"
+		elif [ $LSF_VERSION = "10.1" ]; then
+			HOSTSTRING="slave${i}-id$ID  !   !   1   ()"
+		fi
 		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
 	done
 fi
@@ -50,8 +55,11 @@ if [ $IS_MC = "Y" ]; then
 	# lsf.cluster
 	for((i=$HOST_NUM-1;i>=1;i--))
 	do
-		HOSTSTRING="$LSF_CLUSTER_NAME-slave${i}-id$ID  !   !   1   3.5   ()   ()   ()"
-		echo "$LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME" >> /opt/debug
+		if [ $LSF_VERSION = "9.1" ]; then
+			HOSTSTRING="$LSF_CLUSTER_NAME-slave${i}-id$ID  !   !   1   3.5   ()   ()   ()"
+		elif [ $LSF_VERSION = "10.1" ]; then
+			HOSTSTRING="$LSF_CLUSTER_NAME-slave${i}-id$ID  !   !   1   ()"
+		fi
 		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
 	done	
 	
