@@ -45,7 +45,60 @@ if [ $IS_MC = "N" ]; then
 		fi
 		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
 	done
+	
+	if [ $IS_DM = "Y" ]; then
+		if [ $DM_VERSION = "9.1" ]; then
+			cd $LSF_TOP/9.1/install
+			./patchinstall --silent -f $LSF_TOP/conf/lsf.conf /opt/dminstalldir/lsf9.1.3_linux2.6-glibc2.3-x86_64-242435.tar.Z
+			cd /opt/dminstalldir/
+			tar -zxvf lsf9.1.3_data_mgr-linux-x64.tar.Z
+			. $LSF_TOP/conf/profile.lsf
+			cd /opt/dminstalldir/lsf9.1.3_data_mgr-linux-x64
+			
+			cp 9.1/linux2.6-glibc2.3-x86_64/etc/dmd $LSF_SERVERDIR/
+			cp 9.1/linux2.6-glibc2.3-x86_64/bin/* $LSF_BINDIR/
+			cp conf/TMPL.lsf.datamanager $LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			chown lsfadmin $LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			cp -R man/* $LSF_BINDIR/../../man/
+			cp 1986-03.com.ibm_IBM_Platform_Data_Manager_for_LSF-9.1.3.swidtag $LSF_BINDIR/../../../properties/version
+
+			# Install the latest DM patch 330371 
+			cd $LSF_ENVDIR/../9.1/install
+			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf9.1.3_linux2.6-glibc2.3-x86_64-330371.tar.Z
+		
+			# Configure LSF and DM
+			echo "LSF_DATA_HOSTS=slave1-id$ID" >> $LSF_ENVDIR/lsf.conf
+			echo "LSF_DATA_PORT=45780" >> $LSF_ENVDIR/lsf.conf
+
+			mkdir -p /opt/$LSF_CLUSTER_NAME/dmsa
+
+			dmconf=$LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			echo "Begin Parameters" >> $dmconf
+			echo "ADMINS = lsfadmin" >> $dmconf
+			echo "STAGING_AREA = /opt/$LSF_CLUSTER_NAME/dmsa" >> $dmconf
+			echo "CACHE_INPUT_GRACE_PERIOD = 1440" >> $dmconf
+			echo "CACHE_OUTPUT_GRACE_PERIOD = 180" >> $dmconf
+			echo "CACHE_PERMISSIONS = user" >> $dmconf
+			echo "QUERY_NTHREADS = 4" >> $dmconf
+			echo "End Parameters" >> $dmconf
+			
+			tranq=$LSF_ENVDIR/lsbatch/$LSF_CLUSTER_NAME/configdir/lsb.queues
+			echo -e "\nBegin Queue" >> $tranq
+			echo "QUEUE_NAME = transfer" >> $tranq
+			echo "DATA_TRANSFER = Y" >> $tranq
+			echo "HOSTS = slave2-id$ID" >> $tranq
+			echo "End Queue" >> $tranq
+
+			echo "LSF_DATA_PORT=45780" >> lsf.conf
+
+
+		elif [ $DM_VERSION= "10.1" ]; then
+			echo "DM10.1..."
+		fi
+	fi
 fi
+
+
 
 if [ $IS_MC = "Y" ]; then
 	echo "MC"

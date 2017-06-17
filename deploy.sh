@@ -23,6 +23,7 @@ INSTALL_LOCK="$NFS.lockfile"
 INSTALL_PACKAGE_DIR_FOR_LSF913=""
 INSTALL_PACKAGE_DIR_FOR_LSF101=""
 INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=""
+INSTALL_PACKAGE_DIR_FOR_DM913=""
 
 
 # LSF spk files directory
@@ -63,6 +64,11 @@ function funcClean() {
 	if [ -L "installdir" ]; then
 		unlink installdir
 		echo "Unlinked installdir"
+	fi
+	
+	if [ -L "dminstalldir" ]; then
+		unlink dminstalldir
+		echo "Unlinked dminstalldir"
 	fi
 	echo "Cleaning completed!"
 }
@@ -114,12 +120,22 @@ function funcInitial() {
 					# Feed to patch installation function 
 					LSF_PATCH_FILE=`ls $SPK_DIR_FOR_LSF913`
 					LSF_PATCH_FILE="$SPK_DIR_FOR_LSF913/$LSF_PATCH_FILE"
+					
+					# Check if DM will be installed
+					if [ $productName = "DM" ]; then
+						installPackageDir4DM=$INSTALL_PACKAGE_DIR_FOR_DM913
+					fi
 			;;
 			
 			"10.1")
 					installPackageDir=$INSTALL_PACKAGE_DIR_FOR_LSF101
 					LSF_PATCH_FILE=`ls $SPK_DIR_FOR_LSF101`
 					LSF_PATCH_FILE="$SPK_DIR_FOR_LSF101/$LSF_PATCH_FILE"
+					
+					# Check if DM will be installed
+					if [ $productName = "DM" ]; then
+						installPackageDir4DM=$INSTALL_PACKAGE_DIR_FOR_DM101
+					fi
 			;;
 			
 			*)
@@ -132,6 +148,11 @@ function funcInitial() {
 	
 	# Logic to judge from  where to copy installation packages
 	ln -s $installPackageDir installdir
+	
+	if [ $productName = "DM" ]; then
+		echo "installPackageDir4DM=$installPackageDir4DM"
+		ln -s $installPackageDir4DM dminstalldir
+	fi
 	echo -e "Initializing Completed!\n"
 	#cp -r $installPackageDir installdir
 	#echo -e "Installtion Packages are linked to $(pwd)/installdir\n"
@@ -166,6 +187,9 @@ function funcCreateNFS() {
 	export nfs="NFS-id$ID"
 	docker run -v $NFS --name $nfs $IMAGE echo "NFS-id$ID" > /dev/null
 	docker cp -L $(pwd)/installdir $nfs:$NFS
+	if [ -L $(pwd)/dminstalldir ]; then
+		docker cp -L $(pwd)/dminstalldir $nfs:$NFS
+	fi
 	docker cp $(pwd)/install.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/install.exp $nfs:$NFS
 	docker cp $(pwd)/sshnopasswd $nfs:$NFS
@@ -227,12 +251,16 @@ function funcPatch() {
 # Input Parameters:
 # needInstallPatch (y or n) 
 # lsfVersion (9.1 or 10.1)
+# isDM (Y or N)
+# dmVersion (9.1 or 10.1)
 
 function funcInstall() {
 	echo "Starting Installation..."
 	# Standard LSF
 	needInstallPatch=$1
 	lsfVersion=$2
+	isDM=$3
+	dmVersion=$4
 	
 	case $lsfVersion in 
 			"9.1")
@@ -278,7 +306,7 @@ function funcInstall() {
 	isMC="N"
 	domain="$CLUSTER_NAME$ID.com"
 	Install="Install-id$ID"
-	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
 	docker wait $Install > /dev/null 2>&1
@@ -594,7 +622,7 @@ function funcUserInteract() {
 	echo -e "1. LSF"
 	echo -e "2. Multiple Cluster"
 	echo -e "3. SAS (LSF+PPM)"
-	#echo -e "4. Data Manager"
+	echo -e "4. Data Manager"
 	#echo -e "5. License Scheudler"
 	read -p "Your choice:(1)" choice
 	choice=${choice:-1}
@@ -687,6 +715,49 @@ function funcUserInteract() {
 		
 		"4")
 			echo "Data Manager"
+			
+			PRODUCTS_NAME="DM"
+			isDM="Y"
+
+			echo -e "Choose Data Manager version:\n"
+			echo -e "1. LSF9.1.3 + DM9.1.3\n"
+			#echo -e "2. LSF10.1 + DM10.1\n"
+			read -p "Input:(1)" version
+			version=${version:-1}
+			if [ $version = "1" ];then
+				LSF_VERSION=9.1.3
+				# To specify $LSF_TOP/<version>/
+				lsfVersion=9.1
+				dmVersion=9.1
+			elif [ $version = "2" ];then
+				LSF_VERSION=10.1
+				# To specify $LSF_TOP/<version>/
+				lsfVersion=10.1
+				dmVersion=10.1
+			else
+				echo "Wrong Input. Exit!"
+				EXIT
+			fi
+			read -p "Input Cluster Name:(mycluster)" clusterName
+			clusterName=${clusterName:-"mycluster"}
+			CLUSTER_NAME=$clusterName
+			read -p "How many hosts do you want to create?(5)" hostNum
+			hostNum=${hostNum:-5}
+			HOST_NUM=$hostNum
+			if [ $hostNum -lt 3 ]; then
+				echo -e "DM cluster has 3 hosts at least. Exit..."
+				EXIT
+			fi
+			
+			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
+			needInstallPatch=${needInstallPatch:-"n"}
+			
+			funcInitial $PRODUCTS_NAME $LSF_VERSION
+			funcCreateNFS
+			#funcInstall $PRODUCTS_NAME $CLUSTER_NAME $CLUSTER_NUMBER $HOST_NUM
+			funcInstall $needInstallPatch $lsfVersion $isDM $dmVersion
+			funcBuildCluster
+			
 		;;
 		
 		"3")

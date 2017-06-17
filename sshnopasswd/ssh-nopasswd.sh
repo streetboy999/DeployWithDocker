@@ -7,11 +7,11 @@ USERNAME=`whoami`
 # Considering the performance I only choose root to set ssh passwordless
 
 hostNum=`cat $(pwd)/hosts.$CLUSTER_NAME | wc -l`
-if [ $hostNum -gt 3 ]; then
+if [ $hostNum -gt 5 ]; then
 	exit
 fi
 
-for user in root
+for user in root lsfadmin
 do
 	if [ $user = "root" ]
 	then
