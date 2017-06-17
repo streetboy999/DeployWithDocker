@@ -15,7 +15,9 @@ fi
 # Go to LSF install dir
 cd $LSF_TOP/$LSF_VERSION/install
 
-./patchinstall --silent -f $LSF_TOP/conf/lsf.conf $LSF_PATCH_FILE
+# In LSF10.1, sometimes it requires to accept the license agreement even though chose silent installation
+# Pass "1" to the patch installation script
+echo 1 | ./patchinstall --silent -f $LSF_TOP/conf/lsf.conf $LSF_PATCH_FILE
 
 
 
