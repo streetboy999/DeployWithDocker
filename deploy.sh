@@ -70,7 +70,20 @@ function funcClean() {
 		unlink dminstalldir
 		echo "Unlinked dminstalldir"
 	fi
-	echo "Cleaning completed!"
+	user=`whoami`
+	if [ -e $(pwd)/user_id.track ]; then
+		echo "`date`" >> $(pwd)/user_id.track
+    	echo "User: $user ID: id$ID" >> $(pwd)/user_id.track
+    	echo "-----------------------" >> $(pwd)/user_id.track
+
+	else
+		touch $(pwd)/user_id.track
+		chmod 777 $(pwd)/user_id.track
+		echo "`date`" >> $(pwd)/user_id.track
+    	echo "User: $user ID: id$ID" >> $(pwd)/user_id.track
+    	echo "-----------------------" >> $(pwd)/user_id.track
+	fi
+    echo "Cleaning completed!"
 }
 
 # Customize the EXIT function and can define the user's own operations before exit
@@ -150,7 +163,6 @@ function funcInitial() {
 	ln -s $installPackageDir installdir
 	
 	if [ $productName = "DM" ]; then
-		echo "installPackageDir4DM=$installPackageDir4DM"
 		ln -s $installPackageDir4DM dminstalldir
 	fi
 	echo -e "Initializing Completed!\n"
@@ -617,7 +629,7 @@ function funcLog() {
 # It has two ways: 1. Interactive 2. CLI
 
 function funcUserInteract() {
-	echo -e "	Welcome to use the automatic IBM Spectrum products deployment tool!\n\n"
+	echo -e "	\nIBM LSF Automatic Deployment Tool (beta)\n\n"
 	echo -e "What products do you want to deploy:"
 	echo -e "1. LSF"
 	echo -e "2. Multiple Cluster"
