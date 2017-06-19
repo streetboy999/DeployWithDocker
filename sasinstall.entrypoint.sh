@@ -41,6 +41,8 @@ if [ $IS_SAS = "Y" ]; then
 	
 	# Configure LSF cluster
 	sed -i '$a\LSF_STRIP_DOMAIN='"$LSF_DOMAIN"'' $LSF_TOP/conf/lsf.conf
+	# Disable EGO as pem somehow consumes a lot of CPU
+	sed -i 's/LSF_ENABLE_EGO=Y/LSF_ENABLE_EGO=N/g' $LSF_TOP/conf/lsf.conf
 	for((i=$HOST_NUM-1;i>=1;i--))
 	do
 		HOSTSTRING="slave$i  !   !   1   3.5   ()   ()   ()"
