@@ -2,7 +2,7 @@
 
 ### Run in a docker container to install SAS ###
 
-#Input Env Vars: SAS_INSTALL_PACK SAS_INSTALL_ENTITLEMENT_FILE SAS_INSTALL_DIR IS_SAS 
+#Input Env Vars: SAS_INSTALL_PACK SAS_INSTALL_ENTITLEMENT_FILE SAS_INSTALL_DIR IS_SAS SAS_INSTALL_DIR_WITH_VERSION ID FLOW_EDITOR
 
 if [ $IS_SAS = "Y" ]; then
 
@@ -14,10 +14,12 @@ if [ $IS_SAS = "Y" ]; then
 	fi
 	
 	#
-	tar -xvf $SAS_INSTALL_PACK -C $NFS
+	cd $SAS_INSTALL_DIR #/opt/sasinstalldir
+	#tar -xvf $SAS_INSTALL_PACK -C $NFS
+	tar -xvf $SAS_INSTALL_PACK
 	sleep 1
-	cp $SAS_INSTALL_ENTITLEMENT_FILE $SAS_INSTALL_DIR/license.dat
-	cd $SAS_INSTALL_DIR
+	cp $SAS_INSTALL_ENTITLEMENT_FILE $SAS_INSTALL_DIR_WITH_VERSION/license.dat
+	cd $SAS_INSTALL_DIR_WITH_VERSION
 	cp install.config install.config.bak
 
 	echo "JS_TOP=$JS_TOP" >> install.config
@@ -28,7 +30,7 @@ if [ $IS_SAS = "Y" ]; then
 	echo "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" >> install.config
 	echo "LSF_MASTER_LIST=$LSF_MASTER_LIST" >> install.config
 	
-	JSLIB="pm9.1.3.0_install/instlib"
+	JSLIB="`ls | grep pm | grep install`/instlib"
 	
 	# Hack the binary type. I don't know why the script cannot get the correct binary type. 
 	cp $JSLIB/binary_type.sh $JSLIB/binary_type.sh.bak
@@ -36,7 +38,7 @@ if [ $IS_SAS = "Y" ]; then
 	
 	$NFS/sasinstall.exp install.config
 	
-	sleep 15
+	#sleep 15
 	
 	
 	# Configure LSF cluster
@@ -45,7 +47,7 @@ if [ $IS_SAS = "Y" ]; then
 	sed -i 's/LSF_ENABLE_EGO=Y/LSF_ENABLE_EGO=N/g' $LSF_TOP/conf/lsf.conf
 	for((i=$HOST_NUM-1;i>=1;i--))
 	do
-		HOSTSTRING="slave$i  !   !   1   3.5   ()   ()   ()"
+		HOSTSTRING="slave$i-id$ID  !   !   1   3.5   ()   ()   ()"
 		echo "$LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME" >> /opt/debug
 		sed -i "/HOSTNAME/a $HOSTSTRING" $LSF_TOP/conf/lsf.cluster.$LSF_CLUSTER_NAME
 	done
@@ -56,7 +58,11 @@ if [ $IS_SAS = "Y" ]; then
 	cp $JS_TOP/conf/profile.js $JS_TOP/conf/profile.js.bak
 	sed -i 's/BINARY_TYPE=\"fail\"/BINARY_TYPE=linux2.6-glibc2.3-x86_64/g' $JS_TOP/conf/profile.js
 	
+	# Copy floweditor file as SAS package doesn't have this file
+	chmod 755 $FLOW_EDITOR
+	mv $FLOW_EDITOR $JS_TOP/9.1/bin
 fi
+
 
 
 

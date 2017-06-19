@@ -5,17 +5,17 @@ set installFile [lindex $argv 0]
 
 spawn ./jsinstall -f ./$installFile
 expect {
-	"to accept the agreement" {send "1\r";exp_continue}
+	"Press Enter to continue viewing the license agreement" {send "1\r";exp_continue}
 	"Press 1 or Enter to install this host type:" {send "1\r";exp_continue}
 	"E.g. 1 3 7, or press Enter for all" {send "\r";exp_continue}
 	"Do you want to continue installation" {send "y\r";exp_continue}
 	"Press Enter to continue viewing the license agreement" {send "1\r"}
-	eof
+#	eof
 }
 
-spawn true
-expect eof
-catch wait result
-exit [lindex $result 3]
+#spawn true
+#expect eof
+#catch wait result
+#exit [lindex $result 3]
 
 
