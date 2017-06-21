@@ -1,0 +1,20 @@
+#!/bin/bash
+if [ $1 = "" ]; then
+	echo "Input the container name. Exit."
+	exit
+fi
+
+if [ $1 = "all" ]; then
+#docker stop $(docker ps -a -q)
+#	docker rm -v $(docker ps -a -q)
+	echo "Stopping following containers:"
+	docker stop $(docker ps -a --format '{{.Names}}')
+	echo "Removing following containers:"
+	docker rm -v $(docker ps -a --format '{{.Names}}')
+else
+	echo "Stopping following containers:"
+	docker stop $(docker ps -a --format '{{.Names}}' | grep "$1")
+	echo "Removing following containers:"
+	docker rm -v $(docker ps -a --format '{{.Names}}' | grep "$1")
+fi
+

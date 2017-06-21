@@ -19,6 +19,6 @@ SPK_DIR_FOR_LSF101="/Users/cwwu/Docker/Project/P2-AutoInstall/Raw_Packages/LSF10
 
 
 # The image file that you choose to create docker containers
-IMAGE="ubuntu:17.04.v1"
-IMAGE4SAS="ubuntu:17.04.v2"
+IMAGE="ubuntu:17.04.v4"
+IMAGE4SAS="ubuntu:17.04.v4"
 
