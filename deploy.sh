@@ -56,10 +56,18 @@ function ID++(){
 # Remove lock file if the tool exits
 function funcClean() {
 	echo -e "\nCleaning..."
+	currentUser="`whoami`"
+	lockOwner="`ls -la | grep .lockfile | awk '{print $3}'`"
 	if [ -e $(pwd)/.lockfile ]; then
-		rm $(pwd)/.lockfile
-		if [ $? -eq 0 ]; then
-			echo "Released lock file"
+		if [ $currentUser = $lockOwner ]; then
+			rm $(pwd)/.lockfile
+			
+			if [ $? -eq 0 ]; then
+				echo "Released lock file"
+			fi
+		else
+			echo "Cleaning completed!"
+			exit
 		fi
 	fi
 	if [ -L "installdir" ]; then
@@ -834,10 +842,12 @@ trap funcTrapInt SIGINT
 
 while [ true ];do
 	if [ -e ./.lockfile ];then
-		echo "Someone is running the tool in parallel. Please wait..."
+		lockOwner="`ls -la | grep .lockfile | awk '{print $3}'`"
+		echo "$lockOwner is running the tool in parallel. Please wait..."
 		sleep 10		
 	else
-		touch ./.lockfile	
+		touch ./.lockfile
+		chmod 600 ./.lockfile
 		break
 	fi
 done
