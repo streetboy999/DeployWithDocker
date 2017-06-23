@@ -1,6 +1,6 @@
 #!/bin/bash
 
-trackFile="./user_id.track"
+trackFile="/usr/local/bin/user_id.track"
 echo -e "\n${USER}'s created hosts:\n"
 echo "----------------------------------"
 for i in `cat $trackFile | grep $USER | awk '{print $4}'`
