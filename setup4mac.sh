@@ -89,8 +89,8 @@ exec 1>$(pwd)/configure.lsf
 echo '## This file defines all environment parameters used by the tool'
 echo "INSTALL_PACKAGE_DIR_FOR_LSF913=$DataDir/Raw_Packages/LSF9.1.3/OriginalPackage"
 echo "INSTALL_PACKAGE_DIR_FOR_LSF101=$DataDir/Raw_Packages/LSF10.1/OriginalPackage"
-echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS81=$DataDir/Raw_Packages/PPM/SASPSS81"
-echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=$DataDir/Raw_Packages/PPM/SASPSS91"
+echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS81=$DataDir/Raw_Packages/SASPSS81"
+echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=$DataDir/Raw_Packages/SASPSS91"
 echo "INSTALL_PACKAGE_DIR_FOR_DM913=$DataDir/Raw_Packages/DM9.1.3"
 echo "SPK_DIR_FOR_LSF913=$DataDir/Raw_Packages/LSF9.1.3/SPK/spk8"
 echo "SPK_DIR_FOR_LSF101=$DataDir/Raw_Packages/LSF10.1/SPK/spk2"

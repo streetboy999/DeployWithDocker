@@ -72,5 +72,8 @@ scp bjhc01.eng.platformlab.ibm.com:/scratch/support3/cwwu/Mybox/Project/Auto.tar
 
 (3) Uncompress Auto.tar.gz to a location where you prefer
 
-(4) Enter the directory of Auto and execute setup4mac.sh
+(4) Configure Xquartz properly to make clients able to connect to XGUI server. Open Xquartz -> Preferences -> Security -> Check "Allow connections from network clients"
+
+(5) Enter the directory of Auto and execute setup4mac.sh
+
 
