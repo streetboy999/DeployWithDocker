@@ -5,14 +5,14 @@ echo -e "\n${USER}'s created hosts:\n"
 echo "----------------------------------"
 for i in `cat $trackFile | grep $USER | awk '{print $4}'`
 do
-	if [ $i = "id1" ]; then
+	if [ $i = "id0" ]; then
 		continue
 	fi
 	ID=$i
-	output=`docker ps --format '{{.Names}}' | grep -w $i | grep -v -w "id1"| head -n1`
+	output=`docker ps --format '{{.Names}}' | grep -w $i | grep -v -w "id0"| head -n1`
 	if [ ! -z $output ];then
 		echo "ID=$ID"
-	        docker ps --format '{{.Names}}' | grep -w $i | grep -v -w "id1" | grep -i -v dns	
+	        docker ps --format '{{.Names}}' | grep -w $i | grep -v -w "id0" | grep -i -v dns	
 		echo "----------------------------------"
 	fi
 done

@@ -74,6 +74,8 @@ scp bjhc01.eng.platformlab.ibm.com:/scratch/support3/cwwu/Mybox/Project/Auto.tar
 
 (4) Configure Xquartz properly to make clients able to connect to XGUI server. Open Xquartz -> Preferences -> Security -> Check "Allow connections from network clients"
 
-(5) Enter the directory of Auto and execute setup4mac.sh
+(5) Start docker service on your Mac. Run docker ps to double check if it is started successfully. 
+
+(6) Enter the directory of Auto and execute setup4mac.sh
 
 

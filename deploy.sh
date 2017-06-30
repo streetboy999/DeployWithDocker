@@ -38,7 +38,7 @@ IMAGE4SAS=""
 # ContainerID file
 CONFIGURE_LSF_FILE="./configure.lsf"
 CONTAINER_ID_FILE="./container.id"
-ID=1
+ID=0
 
 
 

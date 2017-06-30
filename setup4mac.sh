@@ -3,8 +3,9 @@
 ## This script will help you copy all necessary files and setup the environment automatically
 
 IMAGE_FILE_GZ="ubuntu.17.04.v4.tar.gz"
+IMAGE_FILE_DNS_GZ="phensley.docker-dns.latest.tar.gz"
 IMAGE_FILE_TAR="ubuntu.17.04.v4.tar"
-
+IMAGE_FILE_DNS_TAR="phensley.docker-dns.latest.tar"
 
 installDir="/scratch/support3/cwwu/Mybox/tmp/docker/Raw_Packages.tar.gz"
 tarFile="Raw_Packages.tar.gz"
@@ -121,7 +122,14 @@ cd $IMAGE_DIR
 tar -zxvf $IMAGE_FILE_GZ -C .
 
 if [ $? = "1" ]; then
-	echo "Image file $IMAGE_FILE_GZ uncompress error. Exiting..."
+        echo "Image file $IMAGE_FILE_GZ uncompress error. Exiting..."
+	exit
+fi
+
+tar -zxvf $IMAGE_FILE_DNS_GZ -C .
+
+if [ $? = "1" ]; then
+	echo "Image file $IMAGE_FILE_DNS_GZ uncompress error. Exiting..."
 	exit
 fi
 
@@ -129,6 +137,13 @@ docker load -i $IMAGE_FILE_TAR
 
 if [ $? = "1" ]; then
 	echo "Docker loads image file error. Exiting..."
+	exit
+fi
+
+docker load -i $IMAGE_FILE_DNS_TAR
+
+if [ $? = "1" ]; then
+        echo "Docker loads image file error. Exiting..."
 	exit
 fi
 
