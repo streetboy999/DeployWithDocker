@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 ### Interact LSF installation. Called by the entrypoint.sh 
-set timeout 20
+set timeout 200
 set installFile [lindex $argv 0]
 
 spawn ./lsfinstall -f ./$installFile

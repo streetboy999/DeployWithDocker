@@ -1,6 +1,6 @@
 #!/usr/bin/expect
 ### Interact LSF installation. Called by the entrypoint.sh 
-set timeout 30
+set timeout 300
 set installFile [lindex $argv 0]
 
 spawn ./jsinstall -f ./$installFile
