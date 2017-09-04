@@ -60,8 +60,8 @@ function trapSignal(){
 }
 
 
-trap trapSignal SIGUSR1
 
+trap trapSignal SIGUSR1
 
 
 while [ true ];

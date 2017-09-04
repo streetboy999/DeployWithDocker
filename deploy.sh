@@ -498,6 +498,9 @@ function funcBuildCluster() {
 		fi
 		#hostName="${hostName}-id$ID"
 		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+		# Generate a hosts file for hostname-IP reverse resolution
+		hostIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $hostName`
+		echo "$hostIP $hostName" >> $SSH_AUTO/ip-hosts.$CLUSTER_NAME
 		
 		echo $hostName >> $SSH_AUTO/hosts.$CLUSTER_NAME
 		echo "Created LSF HOST: $hostName"
@@ -508,12 +511,16 @@ function funcBuildCluster() {
 	# The file is to feed ssh passwd-less function by getting all container host names
 	docker cp $SSH_AUTO/hosts.$CLUSTER_NAME $nfs:$NFS/sshnopasswd
 	
+	# Copy ip-hosts file to the container
+	docker cp $SSH_AUTO/ip-hosts.$CLUSTER_NAME $nfs:$LSF_TOP/conf/hosts
+	
 	# Start LSF in each container by sending signal SIGUSR1
 	for i in `cat $SSH_AUTO/hosts.$CLUSTER_NAME`; do
 		docker kill -s SIGUSR1 $i > /dev/null 2>&1
 	done
 	
 	rm $SSH_AUTO/hosts.$CLUSTER_NAME
+	rm $SSH_AUTO/ip-hosts.$CLUSTER_NAME
 }
 	
 
@@ -564,11 +571,19 @@ function funcBuildClusterMC() {
 			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 			echo $hostName >> $SSH_AUTO/hosts.$clusterName
+			
+			# Generate a hosts file for hostname-IP reverse resolution
+			hostIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $hostName`
+			echo "$hostIP $hostName" >> $SSH_AUTO/ip-hosts.$clusterName
+			
 			echo "Created LSF HOST: $hostName for cluster: $clusterName"
 
 		done
 		docker cp $SSH_AUTO/hosts.$clusterName $nfs:$NFS/sshnopasswd
+		docker cp $SSH_AUTO/ip-hosts.$clusterName $nfs:$LSF_TOP/conf/hosts
+		
 		rm $SSH_AUTO/hosts.$clusterName
+		rm $SSH_AUTO/ip-hosts.$clusterName
 	done
 	
 	# Start each MC node
