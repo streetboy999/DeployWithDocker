@@ -357,6 +357,8 @@ function funcInstallMC() {
 	
 	needInstallPatch=$1
 	lsfVersion=$2
+	isDM=$3
+	dmVersion=$4
 	
 	case $lsfVersion in 
 			"9.1")
@@ -390,8 +392,14 @@ function funcInstallMC() {
 	domain="MC${ID}.com"
 		
 	#Install LSF for each cluster
+	isSubCluster="N" # If the cluster is submission cluster, it needs to configure remote DM
 	for((i=1;i<=$CLUSTER_NUM;i++))
-	do		
+	do	
+		if [ $i = "1" ]; then
+			isSubCluster="Y"
+		else
+			isSubCluster="N"
+		fi	
 		lsfTop="$NFS/cluster$i"
 		lsfTarDir="$NFS/installdir"
 		entryPointFile="$NFS/install.entrypoint.sh"
@@ -400,7 +408,7 @@ function funcInstallMC() {
 		LSF_TOP=$lsfTop
 		isMC="Y"
 		Install="Install.${lsfClusterName}-id$ID"
-		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
 		
@@ -580,11 +588,25 @@ function funcBuildClusterMC() {
 
 		done
 		docker cp $SSH_AUTO/hosts.$clusterName $nfs:$NFS/sshnopasswd
-		docker cp $SSH_AUTO/ip-hosts.$clusterName $nfs:$LSF_TOP/conf/hosts
+		#docker cp $SSH_AUTO/ip-hosts.$clusterName $nfs:$LSF_TOP/conf/hosts
+		cat $SSH_AUTO/ip-hosts.$clusterName >> $SSH_AUTO/ip-hosts.all
 		
 		rm $SSH_AUTO/hosts.$clusterName
 		rm $SSH_AUTO/ip-hosts.$clusterName
 	done
+	
+	# Copy the file ip-hosts.all (It contains all IP address - hostname for each host in all clusters) to each cluster
+	
+	for((k=1;k<=$CLUSTER_NUM;k++))
+	do
+		clusterName="c$k"
+		lsfTop="$NFS/cluster$k"
+		LSF_TOP=$lsfTop
+		docker cp $SSH_AUTO/ip-hosts.all $nfs:$LSF_TOP/conf/hosts
+	done
+	
+	# Remove the ip-hosts.all file
+	rm $SSH_AUTO/ip-hosts.all
 	
 	# Start each MC node
 
@@ -761,7 +783,7 @@ function funcUserInteract() {
 			needInstallPatch=${needInstallPatch:-"n"}
 			funcInitial $PRODUCTS_NAME $LSF_VERSION
 			funcCreateNFS
-			funcInstallMC $needInstallPatch $lsfVersion
+			funcInstallMC $needInstallPatch $lsfVersion 
 			funcBuildClusterMC
 
 
@@ -779,16 +801,17 @@ function funcUserInteract() {
 			isDM="Y"
 
 			echo -e "Choose Data Manager version:\n"
-			echo -e "1. LSF9.1.3 + DM9.1.3\n"
+			echo -e "1. LSF9.1.3 + DM9.1.3 (Single Cluster)\n"
+			echo -e "2. LSF9.1.3 + DM9.1.3 (MC)\n"
 			#echo -e "2. LSF10.1 + DM10.1\n"
 			read -p "Input:(1)" version
 			version=${version:-1}
-			if [ $version = "1" ];then
+			if [ $version = "1" -o $version = "2" ];then
 				LSF_VERSION=9.1.3
 				# To specify $LSF_TOP/<version>/
 				lsfVersion=9.1
 				dmVersion=9.1
-			elif [ $version = "2" ];then
+			elif [ $version = "3" -o $version = "4" ];then
 				LSF_VERSION=10.1
 				# To specify $LSF_TOP/<version>/
 				lsfVersion=10.1
@@ -797,25 +820,57 @@ function funcUserInteract() {
 				echo "Wrong Input. Exit!"
 				EXIT
 			fi
-			read -p "Input Cluster Name:(mycluster)" clusterName
-			clusterName=${clusterName:-"mycluster"}
-			CLUSTER_NAME=$clusterName
-			read -p "How many hosts do you want to create?(5)" hostNum
-			hostNum=${hostNum:-5}
-			HOST_NUM=$hostNum
-			if [ $hostNum -lt 3 ]; then
-				echo -e "DM cluster has 3 hosts at least. Exit..."
-				EXIT
+			
+			# Single Cluster + DM
+			if [ $version = "1" -o $version = "3" ]; then
+				echo "LSF9.1.3 + DM9.1.3 (Single Cluster)"
+				read -p "Input Cluster Name:(mycluster)" clusterName
+				clusterName=${clusterName:-"mycluster"}
+				CLUSTER_NAME=$clusterName
+				read -p "How many hosts do you want to create?(5)" hostNum
+				hostNum=${hostNum:-5}
+				HOST_NUM=$hostNum
+				if [ $hostNum -lt 3 ]; then
+					echo -e "DM cluster has 3 hosts at least. Exit..."
+					EXIT
+				fi
+			
+				read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
+				needInstallPatch=${needInstallPatch:-"n"}
+			
+				funcInitial $PRODUCTS_NAME $LSF_VERSION
+				funcCreateNFS
+				#funcInstall $PRODUCTS_NAME $CLUSTER_NAME $CLUSTER_NUMBER $HOST_NUM
+				funcInstall $needInstallPatch $lsfVersion $isDM $dmVersion
+				funcBuildCluster			
 			fi
 			
-			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
-			needInstallPatch=${needInstallPatch:-"n"}
+			# MC + DM
+			if [ $version = "2" -o $version = "4" ]; then
+				echo "LSF9.1.3 + DM9.1.3 (MC)"
+				#PRODUCTS_NAME="DM"
+				read -p "How many clusters do you want to create?:(4)" cNum
+				cNum=${cNum:-4}
+				if [ $cNum -lt 2 ]; then
+					echo -e "The smallest number of clusters is 2!\n"
+					EXIT
+				fi
+				CLUSTER_NUM=$cNum
+				read -p "How many nodes in each cluster?:(3)" hNum
+				hNum=${hNum:-3}
+				HOST_NUM=$hNum
+				if [ $hNum -lt 3 ]; then
+					echo -e "DM cluster has 3 hosts at least. Exit..."
+					EXIT
+				fi
 			
-			funcInitial $PRODUCTS_NAME $LSF_VERSION
-			funcCreateNFS
-			#funcInstall $PRODUCTS_NAME $CLUSTER_NAME $CLUSTER_NUMBER $HOST_NUM
-			funcInstall $needInstallPatch $lsfVersion $isDM $dmVersion
-			funcBuildCluster
+				read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
+				needInstallPatch=${needInstallPatch:-"n"}
+				funcInitial $PRODUCTS_NAME $LSF_VERSION
+				funcCreateNFS
+				funcInstallMC $needInstallPatch $lsfVersion $isDM $dmVersion
+				funcBuildClusterMC
+			fi			
 			
 		;;
 		
