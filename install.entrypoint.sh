@@ -12,6 +12,14 @@ if [ "$?" = "1" ];then
 	useradd -m lsfadmin -s /bin/bash
 	echo "lsfadmin:aaa123" | chpasswd
 fi
+
+# Create a shared folder which can be accessed by all compute nodes. 
+
+if [ ! -d "/opt/SHARE_DIR" ]; then
+	mkdir -p /opt/SHARE_DIR
+	chmod 777 /opt/SHARE_DIR
+fi
+
 #Modify LSF installation Script
 
 cp install.config install.config.$LSF_CLUSTER_NAME
@@ -80,6 +88,7 @@ if [ $IS_MC = "N" ]; then
 			echo "CACHE_OUTPUT_GRACE_PERIOD = 180" >> $dmconf
 			echo "CACHE_PERMISSIONS = user" >> $dmconf
 			echo "QUERY_NTHREADS = 4" >> $dmconf
+			echo "CACHE_ACCESSIBLE_FILES=Y" >> $dmconf
 			echo "End Parameters" >> $dmconf
 			
 			tranq=$LSF_ENVDIR/lsbatch/$LSF_CLUSTER_NAME/configdir/lsb.queues
@@ -153,7 +162,12 @@ if [ $IS_MC = "Y" ]; then
 	fi	
 	
 	
-	# MC DM support
+	## MC DM support
+	# MC + DM must follow the principles as below:
+	# 1. dmd can resolve each other (reserve). So a hosts file is needed if the 3rd party dns container cannot. 
+	# 2. The hosts in the remote transfer queue must be able to access the data source as it needs to copy data. 
+	# So it either can access the mount point directly or has ssh passwordless to access the data source. 
+
 	if [ $IS_DM = "Y" ]; then
 		if [ $DM_VERSION = "9.1" ]; then
 			cd $LSF_TOP/9.1/install
@@ -193,6 +207,7 @@ if [ $IS_MC = "Y" ]; then
 			echo "CACHE_OUTPUT_GRACE_PERIOD = 180" >> $dmconf
 			echo "CACHE_PERMISSIONS = user" >> $dmconf
 			echo "QUERY_NTHREADS = 4" >> $dmconf
+			echo "CACHE_ACCESSIBLE_FILES=Y" >> $dmconf
 			echo "End Parameters" >> $dmconf
 			
 			# RemoteDataManagers
