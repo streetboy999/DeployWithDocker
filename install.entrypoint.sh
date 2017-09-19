@@ -73,6 +73,9 @@ if [ $IS_MC = "N" ]; then
 			# Install the latest DM patch 330371 
 			cd $LSF_ENVDIR/../9.1/install
 			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf9.1.3_linux2.6-glibc2.3-x86_64-330371.tar.Z
+			
+			# Install the folder enhancement project for DM9.1.3
+			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf9.1.3_data_mgr-linux-x64-456054.tar.Z
 		
 			# Configure LSF and DM
 			echo "LSF_DATA_HOSTS=slave1-id$ID" >> $LSF_ENVDIR/lsf.conf
@@ -192,7 +195,9 @@ if [ $IS_MC = "Y" ]; then
 			# Install the latest DM patch 330371 
 			cd $LSF_ENVDIR/../9.1/install
 			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf9.1.3_linux2.6-glibc2.3-x86_64-330371.tar.Z
-		
+			
+			# Install the folder enhancement project for DM9.1.3
+			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf9.1.3_data_mgr-linux-x64-456054.tar.Z		
 			# Configure LSF and DM
 			echo "LSF_DATA_HOSTS=${LSF_CLUSTER_NAME}-slave1-id$ID" >> $LSF_ENVDIR/lsf.conf
 			echo "LSF_DATA_PORT=45780" >> $LSF_ENVDIR/lsf.conf

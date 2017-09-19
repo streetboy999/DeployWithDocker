@@ -529,6 +529,10 @@ function funcBuildCluster() {
 	
 	rm $SSH_AUTO/hosts.$CLUSTER_NAME
 	rm $SSH_AUTO/ip-hosts.$CLUSTER_NAME
+	
+	
+	echo -e "\nRun the following command to logon the hosts"
+	echo "dlogin <hostname> (e.g. dlogin master-id001)"
 }
 	
 
@@ -614,6 +618,9 @@ function funcBuildClusterMC() {
 	do
 		docker kill -s SIGUSR1 $i > /dev/null 2>&1
 	done
+	
+	echo -e "\nRun the following command to logon the hosts"
+	echo "dlogin <hostname> (e.g. dlogin c1-master-id001)"
 }
 
 

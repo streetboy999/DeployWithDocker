@@ -20,7 +20,8 @@ do
 		su $user -l -c "$(pwd)/key-gen.exp" &>/dev/null
 	fi
 
-	for host in `cat $(pwd)/hosts.$CLUSTER_NAME | grep -v $HOSTNAME`
+	#for host in `cat $(pwd)/hosts.$CLUSTER_NAME | grep -v $HOSTNAME`
+	for host in `cat $(pwd)/hosts.$CLUSTER_NAME` # Need to include the host itself
 	do
 		if [ $user = "root" ]
 		then 
