@@ -22,7 +22,8 @@ e.g. sudo usermod -aG docker cwwu
 	4) Data Manager 9.1.3 Installation & Configuration 
 NOTE: For MC by default c1 is submission cluster. c2, c3, ... , cn is execution cluster. SndQ on c1 is send queue. RcvQ on other clusters is receive queue. 
       For SAS support due to the XGUI limitation the lab environment doesn't support it. It can run on Mac. 
-      For Data Manager, by default master-id# is LSF master node. slave1-id# is dmd node. slave2-id# is I/O node. 
+      For Data Manager, by default master-id# is LSF master node. slave1-id# is dmd node. slave2-id# is I/O node. In MC+DM environment, by default 
+      c1 is the submission cluster. You can specify any hosts in cluster c1 as the data source host. 
 
 (6) How to login?
 	1) After completing the deployment the tool lists all hosts that you can use. Or you can run docker ps to check what docker hosts are running. 
