@@ -1,6 +1,6 @@
 # DeployWithDocker
 # Author: Justin Wu @ IBM
-Install and deploy IBM LSF with Docker. It is easily to create an environment or destroy if if you don't need it any more.
+Install and deploy IBM LSF with Docker. It is easily to create an environment or destroy it if you don't need it any more.
 
 How to use the tool?
 1. At Beijing lab
