@@ -40,7 +40,8 @@ CONFIGURE_LSF_FILE="./configure.lsf"
 CONTAINER_ID_FILE="./container.id"
 ID=0
 
-
+# Elastic Search Server IP Address
+EC_IP="0.0.0.0"
 
 ## Functions ##
 
@@ -79,6 +80,12 @@ function funcClean() {
 		unlink dminstalldir
 		echo "Unlinked dminstalldir"
 	fi
+	
+	if [ -L "lsfexpinstalldir" ]; then
+		unlink lsfexpinstalldir
+		echo "Unlinked lsfexpinstalldir"
+	fi
+
 	user=`whoami`
 	if [ -e $(pwd)/user_id.track ]; then
 		echo "`date`" >> $(pwd)/user_id.track
@@ -133,6 +140,8 @@ function funcInitial() {
 	
 	productName=$1
 	version=$2
+	isLSFExp=$3 # If LSF Explorer will be installed
+	#isLSFExp="y"
 
 	case $version in 
 			"9.1.3")
@@ -168,12 +177,20 @@ function funcInitial() {
 	
 	export LSF_PATCH_FILE #="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/lsf9.1.3_linux2.6-glibc2.3-x86_64-441747.tar.Z"
 	
+	installPackage4LSFEXP=$INSTALL_PACKAGE_DIR_FOR_LSF_EXPLORER
+	
 	# Logic to judge from  where to copy installation packages
 	ln -s $installPackageDir installdir
 	
 	if [ $productName = "DM" ]; then
 		ln -s $installPackageDir4DM dminstalldir
 	fi
+	
+	# Only if the user requests to deploy LSF Explorer (Either server or client) does it copy installation packages to container.
+	if [[ $isLSFExp =~ ^y[0-1] ]]; then
+		ln -s $installPackage4LSFEXP lsfexpinstalldir
+	fi
+	
 	echo -e "Initializing Completed!\n"
 	#cp -r $installPackageDir installdir
 	#echo -e "Installtion Packages are linked to $(pwd)/installdir\n"
@@ -214,11 +231,18 @@ function funcCreateNFS() {
 	if [ -L $(pwd)/dminstalldir ]; then
 		docker cp -L $(pwd)/dminstalldir $nfs:$NFS
 	fi
+	
+	if [ -L $(pwd)/lsfexpinstalldir ]; then
+		docker cp -L $(pwd)/lsfexpinstalldir $nfs:$NFS
+		docker cp $(pwd)/installlsfexpserver.entrypoint.sh $nfs:$NFS
+	fi
+	
 	docker cp $(pwd)/install.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/install.exp $nfs:$NFS
 	docker cp $(pwd)/sshnopasswd $nfs:$NFS
 	docker cp $(pwd)/buildlsf.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/patchinstall.entrypoint.sh $nfs:$NFS
+
 	export SSH_AUTO="$(pwd)/sshnopasswd"
 	echo -e "NFS node is created successfully!\n"
 }
@@ -266,6 +290,47 @@ function funcPatch() {
 
 }
 
+
+# LSF Explorer Server (elasticsearch) Installation and Startup
+
+# isLSFExp isLSFExp (y1 - Need to install Elastic Search Sever and Client, y0 - Need to install only Elastic Search Client or n - nothing to do)
+
+function funcLSFExpServerSetup() {
+	isLSFExp=$1
+	if test -z "$isLSFExp"; then
+		echo -e "Input parameter error. Exit..."
+		EXIT
+	fi
+	
+	if [ $isLSFExp = "y1" ]; then
+	
+		echo -e "No Elastic Search Server is running. Will Install a new one...\n"
+		echo "Starting LSF Explorer Server (Elastic Search Server) Installation..."
+		EcPackage=`ls $INSTALL_PACKAGE_DIR_FOR_LSF_EXPLORER | grep server`
+		EcPackage="$NFS/lsfexpinstalldir/$EcPackage" #Elasticsearch server installation file
+		entryPointFile="$NFS/installlsfexpserver.entrypoint.sh"
+		# --previleged is necessary as Elastic Search needs to modify system settings like vm.max_map_count
+		docker run --privileged -idt -p 8080:8080 -p 9200:9200 -p 5000:5000 --name elasticsearch -h elasticsearch --volumes-from $nfs --cap-add=SYS_PTRACE -e "ECPACKAGE=$EcPackage" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		# This is to prevent race condition. Elastic search has not started up yet while LSF nodes are all up. 
+		while [ true ];
+		do
+  		  docker logs elasticsearch | grep STARTED >> /dev/null
+  		  if [ $? = "1" ]; then # WEBGUI Service is not started yet
+  		  		sleep 1
+  		  else
+  		  		break
+  		  fi
+		done
+		export EC_IP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' elasticsearch` 
+		echo -e "LSF Explorer Server (Elastic Search Sever) Installation completed!\n"
+	elif [ $isLSFExp = "y0" ]; then
+		export EC_IP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' elasticsearch`
+		echo -e "An Elastic Search Sever is already running! All clients will connect to it.\n"
+	fi
+}
+
+
+
 # Installation
 #
 # Install products. Support multiple products
@@ -278,14 +343,19 @@ function funcPatch() {
 # lsfVersion (9.1 or 10.1)
 # isDM (Y or N)
 # dmVersion (9.1 or 10.1)
-
+# isLSFExp (y1 - Need to install Elastic Search Sever and Client, y0 - Need to install only Elastic Search Client or n - nothing to do)
+# ecIP - Elastic Search IP address
 function funcInstall() {
-	echo "Starting Installation..."
+	echo "Starting LSF Cluster Installation..."
 	# Standard LSF
 	needInstallPatch=$1
 	lsfVersion=$2
 	isDM=$3
 	dmVersion=$4
+	isLSFExp=$5
+	ecIP=$6
+	
+
 	
 	case $lsfVersion in 
 			"9.1")
@@ -295,7 +365,7 @@ function funcInstall() {
 					lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
 	
 					lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep glibc`
-					lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+					lsfInstallBinaryfile="$NFS/installdir/$lsfInstallBinaryfile"
 	
 					lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF913 | grep entitlement`
 					lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"
@@ -305,7 +375,7 @@ function funcInstall() {
 					lsfInstallScriptFile="$NFS/installdir/$lsfInstallScriptFile"
 	
 					lsfInstallBinaryfile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep glibc`
-					lsfInstallBinaryfile="NFS/installdir/$lsfInstallBinaryfile"
+					lsfInstallBinaryfile="$NFS/installdir/$lsfInstallBinaryfile"
 	
 					lsfInstallEntitlementFile=`ls $INSTALL_PACKAGE_DIR_FOR_LSF101 | grep entitlement`
 					lsfInstallEntitlementFile="$NFS/installdir/$lsfInstallEntitlementFile"					
@@ -331,7 +401,7 @@ function funcInstall() {
 	isMC="N"
 	domain="$CLUSTER_NAME$ID.com"
 	Install="Install-id$ID"
-	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
 	docker wait $Install > /dev/null 2>&1
@@ -348,6 +418,14 @@ function funcInstall() {
 
 }
 
+
+##	Params
+#	needInstallPatch=$1
+#	lsfVersion=$2
+#	isDM=$3
+#	dmVersion=$4
+#	isLSFExp=$5
+#	ecIP=$6
 function funcInstallMC() {
 	echo "Starting MC Installation..."
 	# Standard LSF
@@ -359,6 +437,8 @@ function funcInstallMC() {
 	lsfVersion=$2
 	isDM=$3
 	dmVersion=$4
+	isLSFExp=$5
+	ecIP=$6
 	
 	case $lsfVersion in 
 			"9.1")
@@ -408,7 +488,7 @@ function funcInstallMC() {
 		LSF_TOP=$lsfTop
 		isMC="Y"
 		Install="Install.${lsfClusterName}-id$ID"
-		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
 		
@@ -748,10 +828,42 @@ function funcUserInteract() {
 			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
 			needInstallPatch=${needInstallPatch:-"n"}
 			
-			funcInitial $PRODUCTS_NAME $LSF_VERSION
+			read -p "Do you want to be monitored by LSF Explorer?(y/n)(y)" isLSFExp
+			isLSFExp=${isLSFExp:-"y"}
+			
+			if [ $isLSFExp = "y" ]; then
+				echo "Elastic Search needs 2GB memory at least! You need to set it for the docker engine."
+				docker ps | grep elasticsearch >> /dev/null # Check if an elasticsearch is running. If yes, no need to install it again. 
+				isESRunning=$?
+				isLSFExp="$isLSFExp$isESRunning" # y0 or y1
+			fi
+			
+
+			##	Params of funcInitial
+			#	productName=$1
+			#	version=$2
+			#	isLSFExp=$3 If LSF Explorer will be installed
+
+			funcInitial $PRODUCTS_NAME $LSF_VERSION $isLSFExp			
 			funcCreateNFS
-			#funcInstall $PRODUCTS_NAME $CLUSTER_NAME $CLUSTER_NUMBER $HOST_NUM
-			funcInstall $needInstallPatch $lsfVersion
+			
+			##	Params of funcLSFExpServerSetup
+			#	isLSFExp (y1 - Need to install Elastic Search Sever and Client, y0 - Need to install only Elastic Search Client or n - nothing to do)
+			funcLSFExpServerSetup $isLSFExp
+			
+			
+			isDM="N"
+			dmVersion="null"
+			ecIP=$EC_IP #Global Env Var set by funcLSFExpServerSetup
+			echo "debug: EC_IP=$ecIP"
+			##	Params of funcInstall
+			#	needInstallPatch=$1
+			#	lsfVersion=$2
+			#	isDM=$3
+			#	dmVersion=$4
+			#   isLSFExp=$5
+			#	ecIP=$6
+			funcInstall $needInstallPatch $lsfVersion $isDM $dmVersion $isLSFExp $ecIP
 			funcBuildCluster
 
 		;;
@@ -788,9 +900,30 @@ function funcUserInteract() {
 			
 			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
 			needInstallPatch=${needInstallPatch:-"n"}
-			funcInitial $PRODUCTS_NAME $LSF_VERSION
+			
+			
+			read -p "Do you want to be monitored by LSF Explorer?(y/n)(y)" isLSFExp
+			isLSFExp=${isLSFExp:-"y"}
+			
+			if [ $isLSFExp = "y" ]; then
+				echo "Elastic Search needs 2GB memory at least! You need to set it for the docker engine."
+				docker ps | grep elasticsearch >> /dev/null # Check if an elasticsearch is running. If yes, no need to install it again. 
+				isESRunning=$?
+				isLSFExp="$isLSFExp$isESRunning" # y0 or y1
+			fi
+			
+			funcInitial $PRODUCTS_NAME $LSF_VERSION $isLSFExp
 			funcCreateNFS
-			funcInstallMC $needInstallPatch $lsfVersion 
+						
+			##	Params of funcLSFExpServerSetup
+			#	isLSFExp (y1 - Need to install Elastic Search Sever and Client, y0 - Need to install only Elastic Search Client or n - nothing to do)
+			funcLSFExpServerSetup $isLSFExp
+			
+			isDM="N"
+			dmVersion="null"
+			ecIP=$EC_IP #Global Env Var set by funcLSFExpServerSetup
+			
+			funcInstallMC $needInstallPatch $lsfVersion $isDM $dmVersion $isLSFExp $ecIP
 			funcBuildClusterMC
 
 

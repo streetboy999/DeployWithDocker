@@ -1,6 +1,15 @@
 #!/bin/bash
 
 ### Run in a docker container to install LSF ###
+
+# Input Environment vars
+# "EC_IP=$ecIP" "IS_LSFEXP=$isLSFExp" "DM_VERSION=$dmVersion" "IS_DM=$isDM" "LSF_VERSION=$lsfVersion" 
+# "ID=$ID" "LSF_DOMAIN=$domain" "IS_MC=$isMC" "HOST_NUM=$HOST_NUM" "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" 
+# "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" 
+# "LSF_CLUSTER_NAME=$lsfClusterName" "LSF_MASTER_NAME=$lsfMasterName" "LSF_TOP=$lsfTop" "LSF_TAR_DIR=$lsfTarDir"
+
+LSFEXP_INSTALLDIR="/opt/lsfexpinstalldir"
+
 tar -zxvf $LSF_INSTALL_SCRIPT_FILE
 #cd $(pwd)/lsf9.1.3_lsfinstall
 cd $(pwd)/*lsfinstall
@@ -245,5 +254,49 @@ if [ $IS_MC = "Y" ]; then
 	
 fi
 
+
+# Install LSF Explorer Clients 
+if [[ $IS_LSFEXP =~ ^y[0-1] ]]; then
+	cd $LSFEXP_INSTALLDIR
+	installFileName=`ls | grep node | grep gz`
+	tar -zxvf $installFileName
+	lsfExpClientInstallDir=`ls -F | grep '/$' | grep node`
+	cd $lsfExpClientInstallDir
+	echo "EXPLORER_NODE_TOP=/opt/ibm/$LSF_CLUSTER_NAME" >> install.config
+	echo "JDBC_CONNECTION_URL=$EC_IP:9200" >> install.config
+	echo "LSF_ENVDIR=$LSF_TOP/conf" >> install.config
+	if [ $LSF_VERSION = "9.1" ]; then
+		lsfVersion="9"
+	elif [ $LSF_VERSION = "10.1" ]; then
+		lsfVersion="10"
+	fi
+	echo "LSF_VERSION=$lsfVersion" >> install.config
+	echo "EXPLORER_ADMIN=root" >> install.config
+	
+	echo "Y" | ./ExplorerNodeInstaller.sh  -silent -f ./install.config
+	#Hack the issue that cannot find binary type (Due to Centos6.9, it cannot be recoganized to Linux2.6)
+	sed -i 's/BINARY_TYPE=\"fail\"/BINARY_TYPE=linux2.6-glibc2.3-x86_64/g' /opt/ibm/$LSF_CLUSTER_NAME/lsfsuite/ext/perf/conf/profile.perf
+	
+	# Modify LSF configuration file lsb.params to make LSF Exp collect data 
+	lsfParamfile=$LSF_TOP/conf/lsbatch/$LSF_CLUSTER_NAME/configdir/lsb.params
+	paramArray=(
+				ENABLE_EVENT_STREAM=Y
+				"ALLOW_EVENT_TYPE=JOB_NEW JOB_FINISH JOB_FINISH2 JOB_STARTLIMIT JOB_STATUS2 JOB_PENDING_REASONS"
+				INCLUDE_DETAIL_REASONS=y
+				RUNTIME_LOG_INTERVAL=10
+				"GROUP_PEND_JOBS_BY = QUEUE & USERNAME & USER_GROUPS & LICENSE_PROJECT"
+				"PENDING_TIME_RANKING = short[1,20] medium[21,400] long[401,]"
+	)
+	
+	length=${#paramArray[@]}
+	sed -i 's/ENABLE_EVENT_STREAM/\#ENABLE_EVENT_STREAM/g' $lsfParamfile # By default this value is set to n. Comment it, otherwise the last value (n) will take effect. 
+
+	for ((i=$length-1;i>=0;i--))
+	do
+        element=${paramArray[$i]}
+        sed -i "/Begin Parameters/a ${element}" $lsfParamfile
+	done
+	
+fi
 
 
