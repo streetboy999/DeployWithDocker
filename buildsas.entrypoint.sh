@@ -12,7 +12,8 @@ function trapSignal(){
 	# Create User and UserGroup
 
 	groupadd docker
-
+id lsfadmin   # In Centos image, root, lsfadmin, user1~3 were built in. Sudoers are also setup. 
+if [ "$?" = "1" ];then
 	echo "root:aaa123" | chpasswd
 
 	useradd -m lsfadmin -s /bin/bash
@@ -35,7 +36,7 @@ function trapSignal(){
 	sed -i "/secure_path/d" /etc/sudoers
 	sed -i "s/env_reset/\!env_reset/g" /etc/sudoers
 	chmod 440 /etc/sudoers
-	
+fi
 	# Create an automatic setup file. It has two functions:
 	# 1. Create a tty
 	# 2. Source LSF profile
@@ -47,9 +48,18 @@ function trapSignal(){
 	echo '. $LSF_TOP/conf/profile.lsf' >> $setupFile
 	echo '. $JS_TOP/conf/profile.js' >> $setupFile
 	echo 'script -q -c "/bin/bash" /dev/null' >> $setupFile
-	
-	
-	service ssh start
+
+
+	OS_VERSION=`cat /etc/issue | head -n1 | awk '{print $1}'`
+	case $OS_VERSION in 
+	        "CentOS")
+	                service sshd start
+		;;
+          	"Ubuntu")
+		        service ssh start
+		;;
+	esac	
+
 	
 	# Start LSF
 	. $LSF_TOP/conf/profile.lsf

@@ -3,8 +3,10 @@
 ## This script will help you copy all necessary files and setup the environment automatically
 
 IMAGE_FILE_GZ="ubuntu.17.04.v4.tar.gz"
+IMAGE_FILE_GZ_CENTOS="centos.6.9.v2.tar.gz"
 IMAGE_FILE_DNS_GZ="phensley.docker-dns.latest.tar.gz"
 IMAGE_FILE_TAR="ubuntu.17.04.v4.tar"
+IMAGE_FILE_TAR_CENTOS="centos.6.9.v2.tar"
 IMAGE_FILE_DNS_TAR="phensley.docker-dns.latest.tar"
 
 installDir="/scratch/support3/cwwu/Mybox/tmp/docker/Raw_Packages.tar.gz"
@@ -19,8 +21,8 @@ fi
 
 which Xquartz > /dev/null 2>&1
 if [ $? = "1" ]; then
-        echo "Xquartzr is not installed. Exiting..."
-        exit
+        echo "Xquartzr is not installed. You cannot use XGUI which is required by SAS. You can install it later."
+        #exit
 fi
 
 docker ps > /dev/null 2>&1
@@ -95,9 +97,11 @@ echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=$DataDir/Raw_Packages/SASPSS91"
 echo "INSTALL_PACKAGE_DIR_FOR_DM913=$DataDir/Raw_Packages/DM9.1.3"
 echo "SPK_DIR_FOR_LSF913=$DataDir/Raw_Packages/LSF9.1.3/SPK/spk8"
 echo "SPK_DIR_FOR_LSF101=$DataDir/Raw_Packages/LSF10.1/SPK/spk2"
+echo "INSTALL_PACKAGE_DIR_FOR_LSF_EXPLORER=$DataDir/Raw_Packages/LSF_EXPLORER"
 
 echo '# The image file that you choose to create docker containers'
-echo "IMAGE=ubuntu:17.04.v4"
+#echo "IMAGE=ubuntu:17.04.v4"
+echo "IMAGE=centos:6.9.v2"
 echo "IMAGE4SAS=ubuntu:17.04.v4"
 
 exec 1>&6
@@ -126,6 +130,13 @@ if [ $? = "1" ]; then
 	exit
 fi
 
+tar -zxvf $IMAGE_FILE_GZ_CENTOS -C .
+
+if [ $? = "1" ]; then
+        echo "Image file $IMAGE_FILE_GZ_CENTOS uncompress error. Exiting..."
+	exit
+fi
+
 tar -zxvf $IMAGE_FILE_DNS_GZ -C .
 
 if [ $? = "1" ]; then
@@ -134,6 +145,13 @@ if [ $? = "1" ]; then
 fi
 
 docker load -i $IMAGE_FILE_TAR
+
+if [ $? = "1" ]; then
+	echo "Docker loads image file error. Exiting..."
+	exit
+fi
+
+docker load -i $IMAGE_FILE_TAR_CENTOS
 
 if [ $? = "1" ]; then
 	echo "Docker loads image file error. Exiting..."
@@ -161,12 +179,39 @@ fi
 
 echo -e "\nWill link following commands to /usr/local/bin and please input your Mac sudo password.\n   dlogin dsr myhosts allhosts\n"
 
+if [ -L /usr/local/bin/dlogin ]; then
+	sudo unlink /usr/local/bin/dlogin
+fi
 
 sudo ln -s $(pwd)/CLI/dlogin /usr/local/bin/dlogin
+
+
+if [ -L /usr/local/bin/dsr ]; then
+	sudo unlink /usr/local/bin/dsr
+fi
+
 sudo ln -s $(pwd)/CLI/dsr /usr/local/bin/dsr
+
+
+if [ -L /usr/local/bin/myhosts ]; then
+	sudo unlink /usr/local/bin/myhosts
+fi
+
 sudo ln -s $(pwd)/CLI/myhosts /usr/local/bin/myhosts
-sudo ln -s $(pwd)/CLI/allhosts /usr/local/bin/allhosts
+
+
+if [ -L /usr/local/bin/user_id.track ]; then
+	sudo unlink /usr/local/bin/user_id.track
+fi
+
 sudo ln -s $(pwd)/user_id.track /usr/local/bin/user_id.track
+
+	
+
+#sudo ln -s $(pwd)/CLI/dsr /usr/local/bin/dsr
+#sudo ln -s $(pwd)/CLI/myhosts /usr/local/bin/myhosts
+#sudo ln -s $(pwd)/CLI/allhosts /usr/local/bin/allhosts
+#sudo ln -s $(pwd)/user_id.track /usr/local/bin/user_id.track
 
 
 

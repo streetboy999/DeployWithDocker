@@ -310,7 +310,19 @@ function funcLSFExpServerSetup() {
 		EcPackage="$NFS/lsfexpinstalldir/$EcPackage" #Elasticsearch server installation file
 		entryPointFile="$NFS/installlsfexpserver.entrypoint.sh"
 		# --previleged is necessary as Elastic Search needs to modify system settings like vm.max_map_count
-		docker run --privileged -idt -p 8080:8080 -p 9200:9200 -p 5000:5000 --name elasticsearch -h elasticsearch --volumes-from $nfs --cap-add=SYS_PTRACE -e "ECPACKAGE=$EcPackage" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		lsof -i :8080 > /dev/null
+		
+		#8080 is occupied
+		if [ $? = "0" ]; then
+			webPort="8080"
+			echo "Port 8080 is occupied by the following process(es). Please Check. Exit from the tool."
+			lsof -i :$webPort
+			EXIT
+		else
+			webPort="8080:8080"
+		fi
+		docker run --privileged -idt -p $webPort -p 9200:9200 -p 5000:5000 --name elasticsearch -h elasticsearch --volumes-from $nfs --cap-add=SYS_PTRACE -e "ECPACKAGE=$EcPackage" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		export WEBPORT=`docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}}' elasticsearch | awk '{print $6}'`
 		# This is to prevent race condition. Elastic search has not started up yet while LSF nodes are all up. 
 		while [ true ];
 		do
@@ -395,7 +407,7 @@ function funcInstall() {
 	lsfTop="$NFS/cluster"
 	lsfTarDir="$NFS/installdir"
 	entryPointFile="$NFS/install.entrypoint.sh"
-	lsfClusterName=$CLUSTER_NAME
+	lsfClusterName="$CLUSTER_NAME"
 	export lsfMasterName="master-id$ID"
 	LSF_TOP=$lsfTop
 	isMC="N"
@@ -613,6 +625,13 @@ function funcBuildCluster() {
 	
 	echo -e "\nRun the following command to logon the hosts"
 	echo "dlogin <hostname> (e.g. dlogin master-id001)"
+	
+	docker ps | grep elasticsearch > /dev/null
+	if [ $? = 0 ]; then
+		echo "LSF Explorer is installed, access http://<host_ip>:$WEBPORT"
+		echo "e.g. On Mac: http://127.0.0.1:$WEBPORT"
+		echo "e.g. On bjhc01: http://bjhc01.eng.platformlab.ibm.com:$WEBPORT"
+	fi
 }
 	
 
@@ -701,6 +720,12 @@ function funcBuildClusterMC() {
 	
 	echo -e "\nRun the following command to logon the hosts"
 	echo "dlogin <hostname> (e.g. dlogin c1-master-id001)"
+	docker ps | grep elasticsearch > /dev/null
+	if [ $? = 0 ]; then
+		echo "LSF Explorer is installed, access http://<host_ip>:$WEBPORT"
+		echo "e.g. On Mac: http://127.0.0.1:$WEBPORT"
+		echo "e.g. On bjhc01: http://bjhc01.eng.platformlab.ibm.com:$WEBPORT"
+	fi
 }
 
 
@@ -835,10 +860,16 @@ function funcUserInteract() {
 				echo "Elastic Search needs 2GB memory at least! You need to set it for the docker engine."
 				docker ps | grep elasticsearch >> /dev/null # Check if an elasticsearch is running. If yes, no need to install it again. 
 				isESRunning=$?
+				if [ $isESRunning = "0" ]; then
+					export WEBPORT=`docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}}' elasticsearch | awk '{print $6}'`
+				fi
 				isLSFExp="$isLSFExp$isESRunning" # y0 or y1
 			fi
-			
 
+			if [ $isESRunning = "0" ]; then
+				export WEBPORT=`docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}}' elasticsearch | awk '{print $6}'`
+			fi			
+			
 			##	Params of funcInitial
 			#	productName=$1
 			#	version=$2
@@ -855,7 +886,7 @@ function funcUserInteract() {
 			isDM="N"
 			dmVersion="null"
 			ecIP=$EC_IP #Global Env Var set by funcLSFExpServerSetup
-			echo "debug: EC_IP=$ecIP"
+			#echo "debug: EC_IP=$ecIP"
 			##	Params of funcInstall
 			#	needInstallPatch=$1
 			#	lsfVersion=$2
@@ -909,8 +940,12 @@ function funcUserInteract() {
 				echo "Elastic Search needs 2GB memory at least! You need to set it for the docker engine."
 				docker ps | grep elasticsearch >> /dev/null # Check if an elasticsearch is running. If yes, no need to install it again. 
 				isESRunning=$?
+				if [ $isESRunning = "0" ]; then
+					export WEBPORT=`docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}}' elasticsearch | awk '{print $6}'`
+				fi
 				isLSFExp="$isLSFExp$isESRunning" # y0 or y1
 			fi
+			
 			
 			funcInitial $PRODUCTS_NAME $LSF_VERSION $isLSFExp
 			funcCreateNFS

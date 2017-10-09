@@ -23,4 +23,5 @@ SPK_DIR_FOR_LSF101="/Users/cwwu/Docker/Project/P2-AutoInstall/Raw_Packages/LSF10
 #IMAGE="ubuntu:17.04.v4"
 IMAGE="centos:6.9.v2"
 IMAGE4SAS="ubuntu:17.04.v4"
+#IMAGE4SAS="centos:6.9.v2"
 

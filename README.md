@@ -1,5 +1,5 @@
 # DeployWithDocker
-# Author: Justin Wu @ IBM
+# Author: Chunwei Wu @ IBM
 Install and deploy IBM LSF with Docker. It is easily to create an environment or destroy it if you don't need it any more.
 
 How to use the tool?
@@ -15,7 +15,7 @@ e.g. sudo usermod -aG docker cwwu
 (4) With your own Unix account run the script to start as below
 ./deploy.sh
 
-(5) It supports 4 products: 
+(5) It supports 5 products: 
 	1) Single Cluster Installation & Configuration (LSF9.1.3 and LSF10.1) + latest spk (LSF9.1.3 spk8 and LSF10.1 spk2)
 	2) Multiple Cluster Installation & Configuration (LSF9.1.3 and LSF10.1) + latest spk  (LSF9.1.3 spk8 and LSF10.1 spk2)
 	3) SAS PSS81 (PPM9.1) and PSS91 (PPM9.1.3) Installation & Configuration
@@ -24,6 +24,11 @@ NOTE: For MC by default c1 is submission cluster. c2, c3, ... , cn is execution 
       For SAS support due to the XGUI limitation the lab environment doesn't support it. It can run on Mac. 
       For Data Manager, by default master-id# is LSF master node. slave1-id# is dmd node. slave2-id# is I/O node. In MC+DM environment, by default 
       c1 is the submission cluster. You can specify any hosts in cluster c1 as the data source host. 
+    5) LSF Explorer
+    When you install LSF (both single cluster or MC), you will be asked if you want to be monitored by LSF Explorer. (default is yes)
+    The tool will install LSF Explorer (server, elastic search and client). 
+    From your browser access http://bjhc01.eng.platformlab.ibm.com:8080
+    NOTE: If you run the tool on your mac just access http://127.0.0.1:8080
 
 (6) How to login?
 	1) After completing the deployment the tool lists all hosts that you can use. Or you can run docker ps to check what docker hosts are running. 
