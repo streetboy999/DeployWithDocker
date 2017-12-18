@@ -48,6 +48,8 @@ sed -i '$a\LSF_TARDIR='"$LSF_TAR_DIR"'' $installFile
 
 /opt/install.exp $installFile
 
+# add ssh support by default
+echo "LSF_RSH=ssh" >> $LSF_TOP/conf/lsf.conf
 
 # Configure LSF cluster after installation
 if [ $IS_MC = "N" ]; then

@@ -11,7 +11,11 @@ do
 	ID=$i
 	output=`docker ps --format '{{.Names}}' | grep -w $i | grep -v -w "id0"| head -n1`
 	if [ ! -z $output ];then
-		echo "ID=$ID"
+		hname="master-$ID"
+		LSF_TOP='$LSF_TOP'
+		LSF_ENVDIR='$LSF_ENVDIR'
+		cname=`docker exec -u lsfadmin $hname bash -c ". $LSF_TOP/conf/profile.lsf && cd $LSF_ENVDIR && "ls | grep lsf.cluster | awk -F "." '{print $3}'""`
+		echo "ID=$ID Cluster_NAME=$cname"
 	        docker ps --format '{{.Names}}' | grep -w $i | grep -v -w "id0" | grep -i -v dns	
 		echo "----------------------------------"
 	fi

@@ -866,10 +866,11 @@ function funcUserInteract() {
 				isLSFExp="$isLSFExp$isESRunning" # y0 or y1
 			fi
 
+			if [ ! -x $isESRunning ]; then 
 			if [ $isESRunning = "0" ]; then
 				export WEBPORT=`docker inspect --format='{{range $p, $conf := .NetworkSettings.Ports}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}}' elasticsearch | awk '{print $6}'`
 			fi			
-			
+			fi
 			##	Params of funcInitial
 			#	productName=$1
 			#	version=$2
