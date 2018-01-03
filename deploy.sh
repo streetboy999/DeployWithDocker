@@ -624,7 +624,7 @@ function funcBuildCluster() {
 	
 	
 	echo -e "\nRun the following command to logon the hosts"
-	echo "dlogin <hostname> (e.g. dlogin master-id001)"
+	echo "dlogin <hostname> (e.g. dlogin master-id100)"
 	
 	docker ps | grep elasticsearch > /dev/null
 	if [ $? = 0 ]; then
