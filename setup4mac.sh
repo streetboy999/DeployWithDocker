@@ -114,7 +114,7 @@ echo "INSTALL_PACKAGE_DIR_FOR_LSF101=$DataDir/Raw_Packages/LSF10.1/OriginalPacka
 echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS81=$DataDir/Raw_Packages/SASPSS81"
 echo "INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=$DataDir/Raw_Packages/SASPSS91"
 echo "INSTALL_PACKAGE_DIR_FOR_DM913=$DataDir/Raw_Packages/DM9.1.3"
-echo "SPK_DIR_FOR_LSF913=$DataDir/Raw_Packages/LSF9.1.3/SPK/spk8"
+echo "SPK_DIR_FOR_LSF913=$DataDir/Raw_Packages/LSF9.1.3/SPK/spk9"
 echo "SPK_DIR_FOR_LSF101=$DataDir/Raw_Packages/LSF10.1/SPK/spk4"
 echo "INSTALL_PACKAGE_DIR_FOR_LSF_EXPLORER=$DataDir/Raw_Packages/LSF_EXPLORER"
 

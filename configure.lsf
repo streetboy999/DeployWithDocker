@@ -14,7 +14,7 @@ INSTALL_PACKAGE_DIR_FOR_DM913="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Pac
 INSTALL_PACKAGE_DIR_FOR_LSF_EXPLORER="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF_EXPLORER"
 
 # LSF spk files directory
-SPK_DIR_FOR_LSF913="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk8/"
+SPK_DIR_FOR_LSF913="/Users/cwwu/docker/Project/P2-AutoInstall/Raw_Packages/LSF9.1.3/SPK/spk9/"
 SPK_DIR_FOR_LSF101="/Users/cwwu/Docker/Project/P2-AutoInstall/Raw_Packages/LSF10.1/SPK/spk4"
 
 
