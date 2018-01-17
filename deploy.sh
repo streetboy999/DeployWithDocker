@@ -226,7 +226,7 @@ function funcSASInitial() {
 function funcCreateNFS() {
 	echo "Creating NFS node..."
 	export nfs="NFS-id$ID"
-	docker run -v $NFS --name $nfs $IMAGE echo "NFS-id$ID" > /dev/null
+	docker run --privileged=true -v $NFS --name $nfs $IMAGE echo "NFS-id$ID" > /dev/null
 	docker cp -L $(pwd)/installdir $nfs:$NFS
 	if [ -L $(pwd)/dminstalldir ]; then
 		docker cp -L $(pwd)/dminstalldir $nfs:$NFS
@@ -251,7 +251,7 @@ function funcSASCreateNFS() {
 	echo "SAS Creating NFS node..."
 	export nfs="NFS-id$ID"
 	export SAS_INSTALL_DIR="$NFS/sasinstalldir"
-	docker run -v $NFS --name $nfs $IMAGE4SAS echo "NFS-id$ID" > /dev/null
+	docker run --privileged=true -v $NFS --name $nfs $IMAGE4SAS echo "NFS-id$ID" > /dev/null
 	docker cp $SAS_INSTALL_PACK $nfs:$SAS_INSTALL_DIR
 	docker cp $(pwd)/sasinstall.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/sasinstall.exp $nfs:$NFS
@@ -283,7 +283,7 @@ function funcPatch() {
 	docker cp $lsfPatchFile $nfs:$nfsDir/$patchName
 	
 	PatchInstall="PatchInstall-id$ID"
-	docker run -idt --volumes-from $nfs --name $PatchInstall -h $lsfMasterName -e "LSF_VERSION=$lsfVersion" -e "LSF_PATCH_FILE=$nfsDir/$patchName" -e "LSF_TOP=$lsfTop" -e "NFS=$nfsDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker run --privileged=true -idt --volumes-from $nfs --name $PatchInstall -h $lsfMasterName -e "LSF_VERSION=$lsfVersion" -e "LSF_PATCH_FILE=$nfsDir/$patchName" -e "LSF_TOP=$lsfTop" -e "NFS=$nfsDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	docker wait $PatchInstall > /dev/null 2>&1
 	echo -e "Patch Installation Completed!\n"
 	
@@ -413,7 +413,7 @@ function funcInstall() {
 	isMC="N"
 	domain="$CLUSTER_NAME$ID.com"
 	Install="Install-id$ID"
-	docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
 	docker wait $Install > /dev/null 2>&1
@@ -500,7 +500,7 @@ function funcInstallMC() {
 		LSF_TOP=$lsfTop
 		isMC="Y"
 		Install="Install.${lsfClusterName}-id$ID"
-		docker run -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
 		
@@ -551,7 +551,7 @@ function funcSASInstall() {
 	#Input Env Vars: SAS_INSTALL_PACK SAS_INSTALL_ENTITLEMENT_FILE SAS_INSTALL_DIR IS_SAS
 	Install="Install-id$ID"
 	#echo "docker run -idt --volumes-from $nfs --name $Install -h $JS_HOST --cap-add=SYS_PTRACE -e "ID=$ID" -e "LSF_DOMAIN=$LSF_DOMAIN" -e "HOST_NUM=$hostNum" -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$SAS_INSTALL_DIR" -e "SAS_INSTALL_DIR_WITH_VERSION=$sasInstallDirWithVersion" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS"
-	docker run -idt --volumes-from $nfs --name $Install -h $JS_HOST --cap-add=SYS_PTRACE -e "FLOW_EDITOR=$sasFlowEditorFile" -e "ID=$ID" -e "LSF_DOMAIN=$LSF_DOMAIN" -e "HOST_NUM=$hostNum" -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$SAS_INSTALL_DIR" -e "SAS_INSTALL_DIR_WITH_VERSION=$sasInstallDirWithVersion" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS >/dev/null
+	docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $JS_HOST --cap-add=SYS_PTRACE -e "FLOW_EDITOR=$sasFlowEditorFile" -e "ID=$ID" -e "LSF_DOMAIN=$LSF_DOMAIN" -e "HOST_NUM=$hostNum" -e "NFS=$NFS" -e "SAS_INSTALL_PACK=$sasInstallPack" -e "SAS_INSTALL_ENTITLEMENT_FILE=$sasInstallEntitlementFile" -e "SAS_INSTALL_DIR=$SAS_INSTALL_DIR" -e "SAS_INSTALL_DIR_WITH_VERSION=$sasInstallDirWithVersion" -e "IS_SAS=$isSAS" -e "JS_TOP=$JS_TOP" -e "JS_HOST=$JS_HOST" -e "JS_ADMINS=$JS_ADMINS" -e "LSF_INSTALL=$LSF_INSTALL" -e "LSF_TOP=$LSF_TOP" -e "LSF_CLUSTER_NAME=$LSF_CLUSTER_NAME" -e "LSF_MASTER_LIST=$LSF_MASTER_LIST" --entrypoint $entryPointFile $IMAGE4SAS >/dev/null
 	docker wait $Install > /dev/null 2>&1
 	echo -e "SAS (LSF+PM) Installation completed!\n"
 
@@ -571,7 +571,7 @@ function funcBuildCluster() {
 	#sleep 10
 	echo "Starting DNS Server"
 	dns_server="dns-server-id$ID"
-	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
+	docker run --privileged=true -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
 	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $dns_server`
@@ -597,7 +597,7 @@ function funcBuildCluster() {
 
 		fi
 		#hostName="${hostName}-id$ID"
-		docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+		docker run --privileged=true -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		# Generate a hosts file for hostname-IP reverse resolution
 		hostIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $hostName`
 		echo "$hostIP $hostName" >> $SSH_AUTO/ip-hosts.$CLUSTER_NAME
@@ -641,7 +641,7 @@ function funcBuildClusterMC() {
 	domain="MC${ID}.com"
 	echo "Starting DNS Server"
 	dns_server="dns-server-id$ID"
-	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
+	docker run --privileged=true -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
 	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $dns_server`
@@ -679,7 +679,7 @@ function funcBuildClusterMC() {
 			fi
 			hostName="${hostName}-id$ID"
 			hostList="$hostList $hostName"
-			docker run -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+			docker run --privileged=true -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		
 			echo $hostName >> $SSH_AUTO/hosts.$clusterName
 			
@@ -734,7 +734,7 @@ function funcSASBuild() {
 	domain=$LSF_DOMAIN
 	echo "Starting DNS Server"
 	dns_server="dns-server-$ID"
-	docker run -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
+	docker run --privileged=true -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
 	dnsIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $dns_server`
@@ -758,7 +758,7 @@ function funcSASBuild() {
 			IS_JS_MASTER="N"
 		fi
 		hostList="$hostList $hostName"
-		docker run -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from $nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null
+		docker run --privileged=true -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from $nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null
 		
 		echo $hostName >> $SSH_AUTO/hosts.$clusterName
 		echo "Created LSF HOST: $hostName"		
