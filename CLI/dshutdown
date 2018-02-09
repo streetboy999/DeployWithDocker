@@ -1,0 +1,22 @@
+#!/bin/bash
+
+if [ ! $1 ]; then
+	echo "Input the host name. Exit."
+	exit
+fi
+
+if [ $1 = "all" ]; then
+#docker stop $(docker ps -a -q)
+#	docker rm -v $(docker ps -a -q)
+	echo "Stopping following containers:"
+	docker stop $(docker ps --format '{{.Names}}')
+
+else
+	echo "Shutting down following hosts:"
+	
+	for node in $*
+	do		
+		docker stop $(docker ps --format '{{.Names}}' | grep $node)
+	done
+
+fi

@@ -1,0 +1,116 @@
+#!/bin/bash
+
+# The script will start a specified container/host with "all" or container name. 
+# "all" means it will start all shutdown (Exit status) hosts
+# If you specify a host name only it will be started
+
+# The script will do the following things:
+# 1. Find out all Exit containers (Created by deploy.sh script)
+# 2. Start the container (dns first and then each LSF nodes)
+# 3. Update each host's /etc/resolve.conf on 
+# 4. Send the signal "SIGUSR1" to all containers to start LSF automatically
+
+
+# 1. 
+shutdownHostList=`docker ps -a | grep Exited | grep -v NFS | grep -v Install | awk '{print $NF}'`
+shutdownIDList=`docker ps -a | grep Exited | grep -v NFS | grep -v Install | awk '{print $NF}' | awk -F "-" '{print $2}' | grep -v server | uniq`
+for node in $shutdownHostList
+do
+	#dns server host list
+	if [[ $node =~ ^dns-server-id[0-9]{1,} ]]; then
+		shutdownDNSHostList="$shutdownDNSHostList $node"
+	
+	elif [[ $node =~ ^.*((master)|(slave))[0-9]{0,}-id[0-9]{1,}.$ ]]; then
+		shutdownSeverList="$shutdownSeverList $node"
+	fi
+done
+
+echo $shutdownDNSHostList
+echo $shutdownSeverList
+
+if [ ! $1 ]; then
+	echo "Input the host name. Exit."
+	exit
+fi
+
+paramList=$*
+
+# dstart all
+if [ $1 = "all" ]; then
+	echo "all"
+	paramList=$shutdownIDList # NOTE: Here we will not consider only a DNS server is down because by default the user doesn't know the dns server at all!
+	echo $paramList
+fi
+
+# dstart idxxx idyyy
+
+for param in $paramList
+do
+	DNS_SERVER=""
+	DNS_IP=""
+	hostWithID=""
+	serverList=""
+		
+	if [[ $param =~ ^id[0-9]{1,} ]]; then 
+		echo "Starting hosts with ID = $param"
+	
+		input=$param
+		if [[ $shutdownDNSHostList =~ dns-server-${input} ]]; then
+			echo "dns-server is in the list"
+			DNS_SERVER="dns-server-${input}"
+			echo "$DNS_SERVER will be started"
+			docker start $DNS_SERVER
+			DNS_IP=`./dip $DNS_SERVER`
+			echo $DNS_IP
+		else
+			echo "dns-server is still on"
+			DNS_SERVER="dns-server-${input}"
+			DNS_IP=`./dip $DNS_SERVER`
+		fi
+
+	
+		# Start each exited server host
+		for node in $shutdownSeverList
+		do
+			if [[ $node =~ ^.*${input}$ ]]; then
+				echo "$node with $input will be started"
+				hostWithID="$hostWithID $node"
+				docker start $node
+
+			fi
+		done
+	
+		# Update each server's /etc/resolv.conf and $LSF_TOP/conf/hosts
+		serverList=`docker ps -a | grep $input| grep -v dns | grep -v NFS | grep -v Install | awk '{print $NF}'`
+	
+		#debug
+		echo "serverList=$serverList"
+		for node in $serverList
+		do
+			# NOTE: In docker we cannot use sed to modify /etc/resolv.conf directly. The reason is as below:
+			# https://blog.jonathanargentiero.com/docker-sed-cannot-rename-etcsedl8ysxl-device-or-resource-busy/
+			echo "$node 's nameserver will be changed"
+			docker exec -it $node bash -c ' echo $(sed '/nameserver/d' /etc/resolv.conf) > /etc/resolv.conf && echo "nameserver '"$DNS_IP"'" >> /etc/resolv.conf'
+			echo "nameserver is changed successfully"	
+			# Update LSF hosts file
+			SERVER_IP=`./dip $node`
+			docker exec -it $node bash -c 'sed -i "/'"${node}"'/d" $LSF_TOP/conf/hosts && echo "'"$SERVER_IP"' '"$node"'" >> $LSF_TOP/conf/hosts'
+		
+		done
+	
+		# Send signal to each host to startup LSF
+		for node in $hostWithID
+		do
+			docker kill -s SIGUSR2 $node
+			echo "LSF on $node is started"
+		done
+
+
+
+	else 
+		echo "hostname format"
+
+	fi
+
+done
+

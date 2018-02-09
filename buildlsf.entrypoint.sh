@@ -85,8 +85,35 @@ fi
 }
 
 
+function trapSignal_StartLSF(){
+
+	OS_VERSION=`cat /etc/issue | head -n1 | awk '{print $1}'`
+	case $OS_VERSION in 
+	        "CentOS")
+	                service sshd start
+		;;
+          	"Ubuntu")
+		        service ssh start
+		;;
+	esac
+	
+	# Start LSF
+	. $LSF_TOP/conf/profile.lsf
+	$LSF_SERVERDIR/lsf_daemons restart
+	
+	# On the master node start LSF Explorer Collector
+	if [[ `hostname` =~ "master" ]]; then
+			if [ -f /opt/ibm/$CLUSTER_NAME/lsfsuite/ext/perf/conf/profile.perf ]; then
+				. /opt/ibm/$CLUSTER_NAME/lsfsuite/ext/perf/conf/profile.perf
+				perfadmin start plc
+			fi
+	fi	
+}
 
 trap trapSignal SIGUSR1
+
+trap trapSignal_StartLSF SIGUSR2
+
 
 
 while [ true ];
