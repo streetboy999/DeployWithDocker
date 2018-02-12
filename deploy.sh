@@ -612,7 +612,12 @@ function funcBuildCluster() {
 	docker cp $SSH_AUTO/hosts.$CLUSTER_NAME $nfs:$NFS/sshnopasswd
 	
 	# Copy ip-hosts file to the container
-	docker cp $SSH_AUTO/ip-hosts.$CLUSTER_NAME $nfs:$LSF_TOP/conf/hosts
+	#docker cp $SSH_AUTO/ip-hosts.$CLUSTER_NAME $nfs:$LSF_TOP/conf/hosts
+	docker cp $SSH_AUTO/ip-hosts.$CLUSTER_NAME $nfs:$NFS/hosts
+	
+	# Make $LSF_ENVDIR/hosts point to /opt/hosts
+	masterNode="master-id$ID"
+	docker exec -it $masterNode bash -c "ln -s $NFS/hosts $LSF_TOP/conf/hosts"
 	
 	# Start LSF in each container by sending signal SIGUSR1
 	for i in `cat $SSH_AUTO/hosts.$CLUSTER_NAME`; do
@@ -698,14 +703,23 @@ function funcBuildClusterMC() {
 		rm $SSH_AUTO/ip-hosts.$clusterName
 	done
 	
-	# Copy the file ip-hosts.all (It contains all IP address - hostname for each host in all clusters) to each cluster
+	# Copy the file ip-hosts.all (It contains all IP address - hostname for each host in all clusters) to /opt/hosts and make all cluster point to this file. 
+	# This is to make dstart easily to modify the hosts file. Just modify one place and all clusters can know the change
+	
+	#NFS_NODE="NFS-id$ID"
+	docker cp $SSH_AUTO/ip-hosts.all $nfs:$NFS/hosts
 	
 	for((k=1;k<=$CLUSTER_NUM;k++))
 	do
 		clusterName="c$k"
 		lsfTop="$NFS/cluster$k"
 		LSF_TOP=$lsfTop
-		docker cp $SSH_AUTO/ip-hosts.all $nfs:$LSF_TOP/conf/hosts
+		#if [ k=1 ];then
+			#docker cp $SSH_AUTO/ip-hosts.all $nfs:$LSF_TOP/conf/hosts
+		masterNode="c$k-master-id$ID"
+		echo "debug: masterNode=$masterNode"		
+		docker exec -it $masterNode bash -c "ln -s $NFS/hosts $LSF_TOP/conf/hosts"
+		
 	done
 	
 	# Remove the ip-hosts.all file
@@ -733,7 +747,7 @@ function funcSASBuild() {
 	echo "Building SAS Cluster..."
 	domain=$LSF_DOMAIN
 	echo "Starting DNS Server"
-	dns_server="dns-server-$ID"
+	dns_server="dns-server-id$ID"
 	docker run --privileged=true -d --name $dns_server -v /var/run/docker.sock:/docker.sock phensley/docker-dns:latest  --domain $domain > /dev/null 2>&1
 	echo "DNS server is started"
 
@@ -761,15 +775,31 @@ function funcSASBuild() {
 		docker run --privileged=true -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from $nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null
 		
 		echo $hostName >> $SSH_AUTO/hosts.$clusterName
+		
+		# Generate a hosts file for hostname-IP reverse resolution
+		hostIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $hostName`
+		echo "$hostIP $hostName" >> $SSH_AUTO/ip-hosts.$clusterName
+		
 		echo "Created LSF HOST: $hostName"		
 	done
 	docker cp $SSH_AUTO/hosts.$clusterName $nfs:$NFS/sshnopasswd
+	
+	
+	# Copy ip-hosts file to the container
+	#docker cp $SSH_AUTO/ip-hosts.$CLUSTER_NAME $nfs:$LSF_TOP/conf/hosts
+	docker cp $SSH_AUTO/ip-hosts.$clusterName $nfs:$NFS/hosts
+	
+	# Make $LSF_ENVDIR/hosts point to /opt/hosts
+	masterNode="master-id$ID"
+	docker exec -it $masterNode bash -c "ln -s $NFS/hosts $LSF_TOP/conf/hosts"
+	
 	# Start SAS cluster
 	for i in $hostList
 	do
 		docker kill -s SIGUSR1 $i > /dev/null 2>&1
 	done	
 	rm $SSH_AUTO/hosts.$clusterName	
+	rm $SSH_AUTO/ip-hosts.$clusterName
 
 }
 
@@ -853,8 +883,8 @@ function funcUserInteract() {
 			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
 			needInstallPatch=${needInstallPatch:-"n"}
 			
-			read -p "Do you want to be monitored by LSF Explorer?(y/n)(y)" isLSFExp
-			isLSFExp=${isLSFExp:-"y"}
+			read -p "Do you want to be monitored by LSF Explorer?(y/n)(n)" isLSFExp
+			isLSFExp=${isLSFExp:-"n"}
 			
 			if [ $isLSFExp = "y" ]; then
 				echo "Elastic Search needs 2GB memory at least! You need to set it for the docker engine."
@@ -934,8 +964,8 @@ function funcUserInteract() {
 			needInstallPatch=${needInstallPatch:-"n"}
 			
 			
-			read -p "Do you want to be monitored by LSF Explorer?(y/n)(y)" isLSFExp
-			isLSFExp=${isLSFExp:-"y"}
+			read -p "Do you want to be monitored by LSF Explorer?(y/n)(n)" isLSFExp
+			isLSFExp=${isLSFExp:-"n"}
 			
 			if [ $isLSFExp = "y" ]; then
 				echo "Elastic Search needs 2GB memory at least! You need to set it for the docker engine."

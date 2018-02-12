@@ -12,8 +12,11 @@
 
 
 # 1. 
+
+#set -x
+NFS="/opt"
 shutdownHostList=`docker ps -a | grep Exited | grep -v NFS | grep -v Install | awk '{print $NF}'`
-shutdownIDList=`docker ps -a | grep Exited | grep -v NFS | grep -v Install | awk '{print $NF}' | awk -F "-" '{print $2}' | grep -v server | uniq`
+shutdownIDList=`docker ps -a | grep Exited | grep -v NFS | grep -v Install | awk '{print $NF}' | awk -F "-" '{print $NF}' | grep -v server | uniq`
 for node in $shutdownHostList
 do
 	#dns server host list
@@ -25,24 +28,34 @@ do
 	fi
 done
 
-echo $shutdownDNSHostList
-echo $shutdownSeverList
+#echo "debug: shutdownDNSHostList=$shutdownDNSHostList"
+#echo "debug: shutdownSeverList=$shutdownSeverList"
 
 if [ ! $1 ]; then
-	echo "Input the host name. Exit."
+	echo -e "Wrong command input! \n"
+	echo -e "dstart usage:\n"
+	echo -e "dstart [all | idxxx | hostname] \n"
+	echo "Exit..."
 	exit
 fi
+
+if [ $1 = "-h" ]; then
+	echo -e "dstart usage:\n"
+	echo -e "dstart [all | idxxx | hostname] \n"
+	exit
+fi
+
+#if [[ $1 =~  ]]
 
 paramList=$*
 
 # dstart all
 if [ $1 = "all" ]; then
-	echo "all"
+	#echo "all"
 	paramList=$shutdownIDList # NOTE: Here we will not consider only a DNS server is down because by default the user doesn't know the dns server at all!
-	echo $paramList
+	#echo "debug: paramList=$paramList"
 fi
 
-# dstart idxxx idyyy
 
 for param in $paramList
 do
@@ -50,67 +63,103 @@ do
 	DNS_IP=""
 	hostWithID=""
 	serverList=""
+	flag="withid"
+	input=""
 		
-	if [[ $param =~ ^id[0-9]{1,} ]]; then 
-		echo "Starting hosts with ID = $param"
+	if [[ "$param" =~ [a-z]+[0-9]{0,}-id[0-9]{1,} ]]; then # Specify a hostname instead of id number
+		#echo $param
+		flag="withsinglehost"
+		input=`echo "$param" | awk -F '-' '{print $NF}'` # Get the id
+	
+	elif [[ "$param" =~ ^id[0-9]{1,} ]]; then 
+		flag="withid"
+		echo -e "\n\nStarting hosts with ID = $param"
 	
 		input=$param
-		if [[ $shutdownDNSHostList =~ dns-server-${input} ]]; then
-			echo "dns-server is in the list"
-			DNS_SERVER="dns-server-${input}"
-			echo "$DNS_SERVER will be started"
-			docker start $DNS_SERVER
-			DNS_IP=`./dip $DNS_SERVER`
-			echo $DNS_IP
-		else
-			echo "dns-server is still on"
-			DNS_SERVER="dns-server-${input}"
-			DNS_IP=`./dip $DNS_SERVER`
-		fi
+	fi
+		
+		
+	if [[ $shutdownDNSHostList =~ dns-server-${input} ]]; then
+		#echo "debug: dns-server is in the list"
+		DNS_SERVER="dns-server-${input}"
+		echo "$DNS_SERVER will be started"
+		docker start $DNS_SERVER > /dev/null
+		DNS_IP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $DNS_SERVER`
+		#echo $DNS_IP
+	else
+		#echo "debug: dns-server is still on"
+		DNS_SERVER="dns-server-${input}"
+		DNS_IP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $DNS_SERVER`
+	fi
 
+
+	# Start each exited server host
 	
-		# Start each exited server host
+	if [ $flag = "withid" ]; then
 		for node in $shutdownSeverList
 		do
 			if [[ $node =~ ^.*${input}$ ]]; then
-				echo "$node with $input will be started"
+				echo "$node will be started"
 				hostWithID="$hostWithID $node"
-				docker start $node
+				docker start $node > /dev/null
 
 			fi
 		done
-	
-		# Update each server's /etc/resolv.conf and $LSF_TOP/conf/hosts
-		serverList=`docker ps -a | grep $input| grep -v dns | grep -v NFS | grep -v Install | awk '{print $NF}'`
-	
-		#debug
-		echo "serverList=$serverList"
-		for node in $serverList
-		do
-			# NOTE: In docker we cannot use sed to modify /etc/resolv.conf directly. The reason is as below:
-			# https://blog.jonathanargentiero.com/docker-sed-cannot-rename-etcsedl8ysxl-device-or-resource-busy/
-			echo "$node 's nameserver will be changed"
-			docker exec -it $node bash -c ' echo $(sed '/nameserver/d' /etc/resolv.conf) > /etc/resolv.conf && echo "nameserver '"$DNS_IP"'" >> /etc/resolv.conf'
-			echo "nameserver is changed successfully"	
-			# Update LSF hosts file
-			SERVER_IP=`./dip $node`
-			docker exec -it $node bash -c 'sed -i "/'"${node}"'/d" $LSF_TOP/conf/hosts && echo "'"$SERVER_IP"' '"$node"'" >> $LSF_TOP/conf/hosts'
 		
-		done
-	
-		# Send signal to each host to startup LSF
-		for node in $hostWithID
-		do
-			docker kill -s SIGUSR2 $node
-			echo "LSF on $node is started"
-		done
-
-
-
-	else 
-		echo "hostname format"
-
+	elif [ $flag = "withsinglehost" ]; then # 
+		#echo "shutdownSeverList=$shutdownSeverList"
+		if [[ "${shutdownSeverList[@]}" =~ $param ]]; then
+			echo "$param will be started"
+			hostWithID=$param
+			docker start $param > /dev/null
+		else
+			echo "$param is an invalid host or it is still running. Please check."	
+			continue
+		fi
 	fi
 
+	# Update each server's /etc/resolv.conf and $LSF_TOP/conf/hosts
+	serverList=`docker ps | grep $input| grep -v dns | grep -v NFS | grep -v Install | awk '{print $NF}'`
+
+	#debug
+	#echo "debug: serverList=$serverList"
+	for node in $serverList
+	do
+		
+		#if [[ "${shutdownSeverList[@]}" =~ $node ]]; then # Only the hosts which have been stopped can be used to modify the IP. 
+		#	continue
+		#else
+			# NOTE: In docker we cannot use sed to modify /etc/resolv.conf directly. The reason is as below:
+			# https://blog.jonathanargentiero.com/docker-sed-cannot-rename-etcsedl8ysxl-device-or-resource-busy/
+			#echo "debug: $node 's nameserver will be changed"
+			docker exec -it $node bash -c ' echo $(sed '/nameserver/d' /etc/resolv.conf) > /etc/resolv.conf && echo "nameserver '"$DNS_IP"'" >> /etc/resolv.conf'
+			#echo "debug: nameserver is changed successfully"	
+			# Update LSF hosts file
+			SERVER_IP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $node`
+			#docker exec -it $node bash -c 'sed -i "/'"${node}"'/d" $LSF_TOP/conf/hosts && echo "'"$SERVER_IP"' '"$node"'" >> $LSF_TOP/conf/hosts'
+			docker exec -it $node bash -c 'sed -i "/'"${node}"'/d" /opt/hosts && echo "'"$SERVER_IP"' '"$node"'" >> /opt/hosts'
+		
+			# Remove lsb.event.lock file before starting LSF
+			# In docker the PID is easy to repeat. In another words the PID of previous mbatchd is easily to be used by other process while restarting. So the lock file might cause some issue. 
+			docker exec -it $node bash -c "rm  -rf "\$LSF_TOP"/work/"\$CLUSTER_NAME"/logdir/#lsb.event.lock "
+		
+		#fi
+	
+	done
+	
+	echo "All requested nodes are started."
+	echo ""
+	echo "Re-Starting all LSF daemons..."
+
+	# Send signal to each host to startup LSF
+	#for node in $hostWithID
+	for node in `docker ps | grep -v dns-server | grep $input | awk '{print $NF}'`
+	do
+		docker kill -s SIGUSR2 $node > /dev/null
+		echo "LSF on $node is started/restarted"
+	done
+	
+
 done
+
 

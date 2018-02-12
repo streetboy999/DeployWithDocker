@@ -218,10 +218,24 @@ fi
 
 sudo ln -s $(pwd)/CLI/myhosts /usr/local/bin/myhosts
 
+if [ -L /usr/local/bin/dstart ]; then
+	sudo unlink /usr/local/bin/dstart
+fi
+
+sudo ln -s $(pwd)/CLI/dstart /usr/local/bin/dstart
+
+if [ -L /usr/local/bin/dshutdown ]; then
+        sudo unlink /usr/local/bin/dshutdown
+fi
+
+sudo ln -s $(pwd)/CLI/dshutdown /usr/local/bin/dshutdown
+
 
 if [ -L /usr/local/bin/user_id.track ]; then
 	sudo unlink /usr/local/bin/user_id.track
 fi
+
+
 
 sudo ln -s $(pwd)/user_id.track /usr/local/bin/user_id.track
 

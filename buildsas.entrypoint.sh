@@ -77,8 +77,33 @@ fi
 }
 
 
-trap trapSignal SIGUSR1
+function trapSignal_StartSAS(){
 
+	OS_VERSION=`cat /etc/issue | head -n1 | awk '{print $1}'`
+	case $OS_VERSION in 
+	        "CentOS")
+	                service sshd start
+		;;
+          	"Ubuntu")
+		        service ssh start
+		;;
+	esac
+	
+	# Start LSF
+	. $LSF_TOP/conf/profile.lsf
+	$LSF_SERVERDIR/lsf_daemons start
+	
+	# Start PM
+	if [ $IS_JS_MASTER = "Y" ]; then
+		. $JS_TOP/conf/profile.js
+		jadmin start
+	fi
+
+}
+
+
+trap trapSignal SIGUSR1
+trap trapSignal_StartSAS SIGUSR2
 
 
 while [ true ];
