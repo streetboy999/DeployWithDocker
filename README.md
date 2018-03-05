@@ -70,6 +70,11 @@ master-id364
 Remove all containers: dsr all
 Remove a clsuter: dsr idxxx
 
+(4) Shutdown hosts
+dshutdown [all | idxxx | hostname]
+
+(5) Startup hosts
+dstart [all | idxxx | hostname]
 
 - User definition
 By installation I only set 5 users which are "root", "lsfadmin", "user1", "user2" and "user3" and the password is all "aaa123"

@@ -11,7 +11,7 @@ if [ $hostNum -gt 5 ]; then
 	exit
 fi
 
-for user in root lsfadmin
+for user in root lsfadmin user1 user2
 do
 	if [ $user = "root" ]
 	then
