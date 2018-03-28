@@ -4,7 +4,7 @@ HOSTNAME=`hostname`
 USERNAME=`whoami`
 
 #for user in root `ls /home`
-# Considering the performance I only choose root to set ssh passwordless
+# Considering the performance I only choose root, lsfadmin, user1 and user2 to set ssh passwordless
 
 hostNum=`cat $(pwd)/hosts.$CLUSTER_NAME | wc -l`
 if [ $hostNum -gt 5 ]; then
@@ -36,7 +36,7 @@ done
 # For DM+MC, all transfer nodes in each cluster have to access the data source. By default the data source is located 
 # at the submission cluster - c1. So only need to set passwordless from cn-slave2-id* (n>1) to all hosts in c1. 
 
-user="lsfadmin" # Only support lsfadmin ssh no password between transfer nodes and submission cluster nodes
+users="lsfadmin user1 user2" # Only support lsfadmin, user1 and user2 ssh no password between transfer nodes and submission cluster nodes
 # Check if this is a DM installation
 if [ -d /opt/dminstalldir ]; then
 
@@ -53,7 +53,10 @@ if [ -d /opt/dminstalldir ]; then
 			for host in `cat $(pwd)/hosts.c1`
 			do
 				#su $user -l -c "$(pwd)/key-gen.exp" &>/dev/null
-				su $user -l -c "$(pwd)/distr-ssh.exp ~/.ssh/id_rsa.pub $host" &>/dev/null
+				for user in $users
+				do
+					su $user -l -c "$(pwd)/distr-ssh.exp ~/.ssh/id_rsa.pub $host" &>/dev/null
+				done
 				#echo "$HOSTNAME is successful to $host with ssh without a password" >> $(pwd)/log.$HOSTNAME
 			done	
 		fi		
