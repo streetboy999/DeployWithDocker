@@ -167,6 +167,7 @@ function funcInitial() {
 					if [ $productName = "DM" ]; then
 						installPackageDir4DM=$INSTALL_PACKAGE_DIR_FOR_DM101
 					fi
+					
 			;;
 			
 			*)
@@ -185,6 +186,7 @@ function funcInitial() {
 	if [ $productName = "DM" ]; then
 		ln -s $installPackageDir4DM dminstalldir
 	fi
+	
 	
 	# Only if the user requests to deploy LSF Explorer (Either server or client) does it copy installation packages to container.
 	if [[ $isLSFExp =~ ^y[0-1] ]]; then
@@ -239,6 +241,7 @@ function funcCreateNFS() {
 	
 	docker cp $(pwd)/install.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/install.exp $nfs:$NFS
+	docker cp $(pwd)/ssinstall.exp $nfs:$NFS
 	docker cp $(pwd)/sshnopasswd $nfs:$NFS
 	docker cp $(pwd)/buildlsf.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/patchinstall.entrypoint.sh $nfs:$NFS
@@ -357,6 +360,7 @@ function funcLSFExpServerSetup() {
 # dmVersion (9.1 or 10.1)
 # isLSFExp (y1 - Need to install Elastic Search Sever and Client, y0 - Need to install only Elastic Search Client or n - nothing to do)
 # ecIP - Elastic Search IP address
+# isSS - If install Session Scheduler
 function funcInstall() {
 	echo "Starting LSF Cluster Installation..."
 	# Standard LSF
@@ -366,6 +370,7 @@ function funcInstall() {
 	dmVersion=$4
 	isLSFExp=$5
 	ecIP=$6
+	isSS=$7
 	
 
 	
@@ -413,7 +418,7 @@ function funcInstall() {
 	isMC="N"
 	domain="$CLUSTER_NAME$ID.com"
 	Install="Install-id$ID"
-	docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+	docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "IS_SS=$isSS" -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir" --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 	
 	# Block until the installation completes
 	docker wait $Install > /dev/null 2>&1
@@ -888,6 +893,9 @@ function funcUserInteract() {
 			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
 			needInstallPatch=${needInstallPatch:-"n"}
 			
+			read -p "Do you want to install Session Scheduler?(y/n)(n)" isSS
+			isSS=${isSS:-"n"}
+			
 			read -p "Do you want to be monitored by LSF Explorer?(y/n)(n)" isLSFExp
 			isLSFExp=${isLSFExp:-"n"}
 			
@@ -930,7 +938,7 @@ function funcUserInteract() {
 			#	dmVersion=$4
 			#   isLSFExp=$5
 			#	ecIP=$6
-			funcInstall $needInstallPatch $lsfVersion $isDM $dmVersion $isLSFExp $ecIP
+			funcInstall $needInstallPatch $lsfVersion $isDM $dmVersion $isLSFExp $ecIP $isSS
 			funcBuildCluster
 
 		;;

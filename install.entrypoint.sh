@@ -45,8 +45,13 @@ sed -i '$a\LSF_TARDIR='"$LSF_TAR_DIR"'' $installFile
 # Install
 # When entrypoint is called the cwd is "/"
 
-
-/opt/install.exp $installFile
+# SS installation package was put into the same dir of LSF. Just change the installation expect script
+# Just notice that for SS9.1.3, since there is no 9.1.3 package I just put 9.1.2 package there. But I have to change the name to 9.1.3 otherwise the installer cannot find the installation package. 
+if [ $IS_SS="y" ]; then  
+	/opt/ssinstall.exp $installFile
+else
+	/opt/install.exp $installFile
+fi
 
 # add ssh support by default
 echo "LSF_RSH=ssh" >> $LSF_TOP/conf/lsf.conf
