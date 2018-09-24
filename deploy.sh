@@ -597,7 +597,10 @@ function funcBuildCluster() {
 
 		fi
 		#hostName="${hostName}-id$ID"
-		docker run --privileged=true -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+# To support SMTP
+#	docker run --privileged=true -idt -p 25:25 -p 587:587 -p 465:465 --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
+		
+docker run --privileged=true -idt --dns $dnsIP --dns-search $domain --name $hostName -h $hostName --volumes-from $nfs --cap-add=SYS_PTRACE -e "ID=$ID" -e "CLUSTER_NAME=$CLUSTER_NAME" -e "LSF_TOP=$LSF_TOP" -e "NFS=$NFS" -e "LSF_DOMAIN=$domain" --entrypoint $entrypointBuildLSF $IMAGE > /dev/null 2>&1
 		# Generate a hosts file for hostname-IP reverse resolution
 		hostIP=`docker inspect --format='{{.NetworkSettings.IPAddress}}' $hostName`
 		echo "$hostIP $hostName" >> $SSH_AUTO/ip-hosts.$CLUSTER_NAME
@@ -773,6 +776,8 @@ function funcSASBuild() {
 		fi
 		hostList="$hostList $hostName"
 		docker run --privileged=true -idt --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from $nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null
+
+#docker run --privileged=true -idt -p 25:25 -p 587:587 -p 465:465 --name $hostName -h $hostName --dns $dnsIP --dns-search $domain --volumes-from $nfs --cap-add=SYS_PTRACE -e DISPLAY=$ip:0 -e "CLUSTER_NAME=$clusterName" -e "LSF_TOP=$LSF_TOP" -e "JS_TOP=$JS_TOP" -e "IS_JS_MASTER=$IS_JS_MASTER" -v /tmp/.X11-unix:/tmp/.X11-unix --entrypoint $entrypointBuildSAS $IMAGE4SAS > /dev/null
 		
 		echo $hostName >> $SSH_AUTO/hosts.$clusterName
 		
