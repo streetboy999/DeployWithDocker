@@ -25,6 +25,7 @@ INSTALL_PACKAGE_DIR_FOR_LSF101=""
 INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=""
 INSTALL_PACKAGE_DIR_FOR_SAS_PSS81=""
 INSTALL_PACKAGE_DIR_FOR_DM913=""
+INSTALL_PACKAGE_DIR_FOR_DM101=""
 
 
 # LSF spk files directory
@@ -1022,6 +1023,8 @@ function funcUserInteract() {
 			echo -e "Choose Data Manager version:\n"
 			echo -e "1. LSF9.1.3 + DM9.1.3 (Single Cluster)\n"
 			echo -e "2. LSF9.1.3 + DM9.1.3 (MC)\n"
+			echo -e "3. LSF10.1 + DM10.1 (Single Cluster)\n"
+			echo -e "4. LSF10.1 + DM10.1 (MC)\n"
 			#echo -e "2. LSF10.1 + DM10.1\n"
 			read -p "Input:(1)" version
 			version=${version:-1}
@@ -1042,7 +1045,7 @@ function funcUserInteract() {
 			
 			# Single Cluster + DM
 			if [ $version = "1" -o $version = "3" ]; then
-				echo "LSF9.1.3 + DM9.1.3 (Single Cluster)"
+				echo "LSF$LSF_VERSION + DM$dmVersion (Single Cluster)"
 				read -p "Input Cluster Name:(mycluster)" clusterName
 				clusterName=${clusterName:-"mycluster"}
 				CLUSTER_NAME=$clusterName
@@ -1066,7 +1069,7 @@ function funcUserInteract() {
 			
 			# MC + DM
 			if [ $version = "2" -o $version = "4" ]; then
-				echo "LSF9.1.3 + DM9.1.3 (MC)"
+				echo "LSF$LSF_VERSION + DM$dmVersion (MC)"
 				#PRODUCTS_NAME="DM"
 				read -p "How many clusters do you want to create?:(4)" cNum
 				cNum=${cNum:-4}

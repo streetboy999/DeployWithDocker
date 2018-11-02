@@ -120,8 +120,56 @@ if [ $IS_MC = "N" ]; then
 			echo "LSF_DATA_PORT=45780" >> lsf.conf
 
 
-		elif [ $DM_VERSION= "10.1" ]; then
+		elif [ $DM_VERSION = "10.1" ]; then
 			echo "DM10.1..."
+			cd $LSF_TOP/10.1/install
+			#./patchinstall --silent -f $LSF_TOP/conf/lsf.conf /opt/dminstalldir/lsf9.1.3_linux2.6-glibc2.3-x86_64-242435.tar.Z
+			cd /opt/dminstalldir/
+			tar -zxvf lsf10.1_data_mgr-lnx26-x64.tar.Z
+			. $LSF_TOP/conf/profile.lsf
+			cd /opt/dminstalldir/lsf10.1_data_mgr-*
+			
+			cp 10.1/linux2.6-glibc2.3-*/etc/* $LSF_SERVERDIR
+			cp 10.1/linux2.6-glibc2.3-*/bin/* $LSF_BINDIR
+			cp conf/TMPL.lsf.datamanager $LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			chown lsfadmin $LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			cp -R man/* $LSF_BINDIR/../../man/
+			cp ibm.com_IBM_Spectrum_LSF_Data_Manager-10.1.0.swidtag $LSF_BINDIR/../../../properties/version
+			
+			# Install DM spk6
+			
+			# Cannot use LSF_TOP any more after sourcing LSF profile. LSF_ENVDIR can be used instead.
+			cd $LSF_ENVDIR/../10.1/install
+			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf10.1_data_mgr-lnx26-x64-492733.tar.Z
+			
+			
+			
+			# Configure LSF and DM
+			echo "LSF_DATA_HOSTS=slave1-id$ID" >> $LSF_ENVDIR/lsf.conf
+			echo "LSF_DATA_PORT=45780" >> $LSF_ENVDIR/lsf.conf
+
+			mkdir -p /opt/$LSF_CLUSTER_NAME/dmsa
+
+			dmconf=$LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			echo "Begin Parameters" >> $dmconf
+			echo "ADMINS = lsfadmin" >> $dmconf
+			echo "STAGING_AREA = /opt/$LSF_CLUSTER_NAME/dmsa" >> $dmconf
+			echo "CACHE_INPUT_GRACE_PERIOD = 1440" >> $dmconf
+			echo "CACHE_OUTPUT_GRACE_PERIOD = 180" >> $dmconf
+			echo "CACHE_PERMISSIONS = user" >> $dmconf
+			echo "QUERY_NTHREADS = 4" >> $dmconf
+			echo "CACHE_ACCESSIBLE_FILES=Y" >> $dmconf
+			echo "End Parameters" >> $dmconf
+			
+			tranq=$LSF_ENVDIR/lsbatch/$LSF_CLUSTER_NAME/configdir/lsb.queues
+			echo -e "\nBegin Queue" >> $tranq
+			echo "QUEUE_NAME = transfer" >> $tranq
+			echo "DATA_TRANSFER = Y" >> $tranq
+			echo "HOSTS = slave2-id$ID" >> $tranq
+			echo "End Queue" >> $tranq
+
+			echo "LSF_DATA_PORT=45780" >> lsf.conf
+
 		fi
 	fi
 fi
@@ -254,8 +302,73 @@ if [ $IS_MC = "Y" ]; then
 			echo "LSF_DATA_PORT=45780" >> lsf.conf
 
 
-		elif [ $DM_VERSION= "10.1" ]; then
+		elif [ $DM_VERSION = "10.1" ]; then
 			echo "DM10.1..."
+			#cd $LSF_TOP/9.1/install
+			#./patchinstall --silent -f $LSF_TOP/conf/lsf.conf /opt/dminstalldir/lsf9.1.3_linux2.6-glibc2.3-x86_64-242435.tar.Z
+			cd /opt/dminstalldir/
+			
+			#For the DM installation package we only uncompress it once
+			if [ $LSF_CLUSTER_NAME = "c1" ]; then
+				tar -zxvf lsf10.1_data_mgr-lnx26-x64.tar.Z
+			fi
+			
+			. $LSF_TOP/conf/profile.lsf
+			cd /opt/dminstalldir/lsf10.1_data_mgr-*			
+			
+			cp 10.1/linux2.6-glibc2.3-*/etc/* $LSF_SERVERDIR
+			cp 10.1/linux2.6-glibc2.3-*/bin/* $LSF_BINDIR
+			cp conf/TMPL.lsf.datamanager $LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			chown lsfadmin $LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			cp -R man/* $LSF_BINDIR/../../man/
+			cp ibm.com_IBM_Spectrum_LSF_Data_Manager-10.1.0.swidtag $LSF_BINDIR/../../../properties/version			
+			
+			# Install DM spk6
+			
+			# Cannot use LSF_TOP any more after sourcing LSF profile. LSF_ENVDIR can be used instead.
+			cd $LSF_ENVDIR/../10.1/install
+			./patchinstall --silent -f $LSF_ENVDIR/lsf.conf /opt/dminstalldir/lsf10.1_data_mgr-lnx26-x64-492733.tar.Z
+			
+			
+			# Configure LSF and DM
+			echo "LSF_DATA_HOSTS=${LSF_CLUSTER_NAME}-slave1-id$ID" >> $LSF_ENVDIR/lsf.conf
+			echo "LSF_DATA_PORT=45780" >> $LSF_ENVDIR/lsf.conf
+
+			mkdir -p /opt/$LSF_CLUSTER_NAME/dmsa
+
+			dmconf=$LSF_ENVDIR/lsf.datamanager.$LSF_CLUSTER_NAME
+			echo "Begin Parameters" >> $dmconf
+			echo "ADMINS = lsfadmin" >> $dmconf
+			echo "STAGING_AREA = /opt/$LSF_CLUSTER_NAME/dmsa" >> $dmconf
+			echo "CACHE_INPUT_GRACE_PERIOD = 1440" >> $dmconf
+			echo "CACHE_OUTPUT_GRACE_PERIOD = 180" >> $dmconf
+			echo "CACHE_PERMISSIONS = user" >> $dmconf
+			echo "QUERY_NTHREADS = 4" >> $dmconf
+			echo "CACHE_ACCESSIBLE_FILES=Y" >> $dmconf
+			echo "End Parameters" >> $dmconf
+			
+			# RemoteDataManagers
+			
+			if [ $LSF_CLUSTER_NAME = "c1" ]; then			
+				echo "Begin RemoteDataManagers" >> $dmconf
+				echo "CLUSTERNAME	SERVERS	PORT" >> $dmconf
+				for((i=2;i<=$LSF_CLUSTER_NUM;i++)) #Cluster c1 is the submission cluster
+				do
+					echo "c$i	c$i-slave1-id$ID	45780" >> $dmconf
+				done
+			
+				echo "End RemoteDataManagers" >> $dmconf
+			fi
+			
+			tranq=$LSF_ENVDIR/lsbatch/$LSF_CLUSTER_NAME/configdir/lsb.queues
+			echo -e "\nBegin Queue" >> $tranq
+			echo "QUEUE_NAME = transfer" >> $tranq
+			echo "DATA_TRANSFER = Y" >> $tranq
+			echo "HOSTS = ${LSF_CLUSTER_NAME}-slave2-id$ID" >> $tranq
+			echo "End Queue" >> $tranq
+
+			echo "LSF_DATA_PORT=45780" >> lsf.conf
+
 		fi
 	fi
 	
