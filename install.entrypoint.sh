@@ -8,6 +8,11 @@
 # "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" 
 # "LSF_CLUSTER_NAME=$lsfClusterName" "LSF_MASTER_NAME=$lsfMasterName" "LSF_TOP=$lsfTop" "LSF_TAR_DIR=$lsfTarDir"
 
+# Backup env vars because after sourcing LSF profile, all other entrypoint vars are empty
+ismc=$IS_MC
+lsmode=$LS_MODE
+lsfclusternumber=$LSF_CLUSTER_NUM
+
 LSFEXP_INSTALLDIR="/opt/lsfexpinstalldir"
 
 tar -zxvf $LSF_INSTALL_SCRIPT_FILE
@@ -417,6 +422,116 @@ if [[ $IS_LSFEXP =~ ^y[0-1] ]]; then
         sed -i "/Begin Parameters/a ${element}" $lsfParamfile
 	done
 	
+fi
+
+
+# Install and configure License Scheduler
+
+if [ $IS_LS = 'y' ]; then
+    echo "Installing LS"
+    cd /opt/lsinstalldir
+    tar -zxvf *.tar.Z
+    cd *x86_64
+    echo 'SILENT_INSTALL="Y"' >> setup.config
+
+
+
+    if test ! -z $LSF_TOP; then  # If LSF_TOP exists
+        echo "LSF_TOP=$LSF_TOP"
+        echo "Sourced LSF profile"
+        . $LSF_TOP/conf/profile.lsf
+    elif test ! -z $LSF_ENVDIR; then # If LSF_ENVDIR exists (it happens after installing DM)
+        echo "LSF_ENVDIR=$LSF_ENVDIR"
+        echo "Sourced LSF profile"
+        . $LSF_ENVDIR/profile.lsf
+
+    else
+        echo "Error: Cannot find LSF_TOP or LSF_ENV. Exit"
+        exit
+    fi
+    # Install LS silently
+    ./setup
+    cp /opt/lsinstalldir/*entitlement* $LSF_ENVDIR/ls.entitlement
+    echo "LS installation is completed."
+
+    # Configure LS
+    hname=`hostname`
+    echo "debug: hostname=`hostname`"
+    lstoolsdir="/opt/lstoolsinstalldir/flexlm10.8"
+    echo "hname=$hname"
+
+    # Restore env vars
+    IS_MC=$ismc
+    LS_MODE=$lsmode
+    LSF_CLUSTER_NUM=$lsfclusternumber
+
+    echo -e "
+    Restoring entrypoint env var
+    IS_MC=$IS_MC
+    LS_MODE=$LS_MODE
+    LSF_CLUSTER_NUM=$LSF_CLUSTER_NUM
+    "
+
+    if [ $IS_MC = "Y" ]; then
+        if [[ $hname =~ "c1-master" ]]; then # Master node in c1. Will configure lsf.licensescheduler
+            mv $LSF_ENVDIR/lsf.licensescheduler $LSF_ENVDIR/lsf.licensescheduler.bak
+            if [ $LS_MODE = "1" ]; then
+                echo "MC, cluster mode"
+                exec 6>&1
+                exec 1>$LSF_ENVDIR/lsf.licensescheduler
+
+                echo -e "Begin Parameters\nPORT = 9581\nHOSTS = $hname\nADMIN =  lsfadmin\nLM_STAT_INTERVAL=30\nLMSTAT_PATH = $lstoolsdir\nCLUSTER_MODE=y\nMERGE_BY_SERVICE_DOMAIN=Y\nLM_REMOVE_INTERVAL=0\nEnd Parameters"
+
+                echo -e "\nBegin Clusters\nCLUSTERS"
+
+                for((i=1;i<=$LSF_CLUSTER_NUM;i++))
+                do
+                echo "c$i"
+                done
+                echo "End Clusters"
+
+                echo -e "\nBegin ServiceDomain\nNAME = SD1\nLIC_SERVERS = ((1880@$hname))\nEnd ServiceDomain"
+                echo ""
+
+                fstr="c1 1"
+                for((i=2;i<=$LSF_CLUSTER_NUM;i++))
+                do
+                    fstr="$fstr c${i} 1"
+                done
+
+                for((i=1;i<=3;i++))
+                do
+                    echo "Begin Feature"
+                    echo "NAME                  = f${i}0"
+                    echo "LM_LICENSE_NAME       = LSAutoFeature_${i}0"
+                    echo "CLUSTER_DISTRIBUTION  = SD1($fstr)"
+                    echo "End Feature"
+                    echo ""
+                done
+
+                exec 1>&6
+                exec 6>&-
+
+                echo "Configuration is done."
+
+            elif [ $LS_MODE = "2" ]; then
+                echo "MC, project mode"
+            fi
+        else # c2, c3 ...
+            mv $LSF_ENVDIR/lsf.licensescheduler $LSF_ENVDIR/lsf.licensescheduler.bak
+            ln -s /opt/cluster1/conf/lsf.licensescheduler $LSF_ENVDIR/lsf.licensescheduler
+        fi
+    elif [ $IS_MC = "N" ]; then
+        if [ $LS_MODE = "1" ]; then
+            echo "Single cluster, cluster mode"
+        elif [ $LS_MODE = "2" ]; then
+            echo "Single cluster, project mode"
+        fi
+
+    fi
+
+    chown lsfadmin $LSF_ENVDIR/lsf.licensescheduler
+
 fi
 
 

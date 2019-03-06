@@ -26,6 +26,9 @@ INSTALL_PACKAGE_DIR_FOR_SAS_PSS91=""
 INSTALL_PACKAGE_DIR_FOR_SAS_PSS81=""
 INSTALL_PACKAGE_DIR_FOR_DM913=""
 INSTALL_PACKAGE_DIR_FOR_DM101=""
+INSTALL_PACKAGE_DIR_FOR_LS9=""
+INSTALL_PACKAGE_DIR_FOR_LS10=""
+INSTALL_PACKAGE_DIR_FOR_LS_TOOLS=""
 
 
 # LSF spk files directory
@@ -87,6 +90,16 @@ function funcClean() {
 		echo "Unlinked lsfexpinstalldir"
 	fi
 
+    if [ -L "lsinstalldir" ]; then
+        unlink lsinstalldir
+        echo "Unlinked lsinstalldir"
+    fi
+
+    if [ -L "lstoolsinstalldir" ]; then
+        unlink lstoolsinstalldir
+        echo "Unlinked lstoolsinstalldir"
+    fi
+
 	user=`whoami`
 	if [ -e $(pwd)/user_id.track ]; then
 		echo "`date`" >> $(pwd)/user_id.track
@@ -143,6 +156,7 @@ function funcInitial() {
 	version=$2
 	isLSFExp=$3 # If LSF Explorer will be installed
 	#isLSFExp="y"
+    isLS=$4 # If LS is installed
 
 	case $version in 
 			"9.1.3")
@@ -157,6 +171,12 @@ function funcInitial() {
 					if [ $productName = "DM" ]; then
 						installPackageDir4DM=$INSTALL_PACKAGE_DIR_FOR_DM913
 					fi
+
+                    # Check if LS will be installed
+                    if [ $isLS = "y" ]; then
+                        installPackageDir4LS=$INSTALL_PACKAGE_DIR_FOR_LS9
+                        installPackageDir4LS_TOOLS=$INSTALL_PACKAGE_DIR_FOR_LS_TOOLS
+                    fi
 			;;
 			
 			"10.1")
@@ -168,6 +188,12 @@ function funcInitial() {
 					if [ $productName = "DM" ]; then
 						installPackageDir4DM=$INSTALL_PACKAGE_DIR_FOR_DM101
 					fi
+
+                    # Check if LS will be installed
+                    if [ $isLS = "y" ]; then
+                        installPackageDir4LS=$INSTALL_PACKAGE_DIR_FOR_LS10
+                        installPackageDir4LS_TOOLS=$INSTALL_PACKAGE_DIR_FOR_LS_TOOLS
+                    fi
 					
 			;;
 			
@@ -193,6 +219,12 @@ function funcInitial() {
 	if [[ $isLSFExp =~ ^y[0-1] ]]; then
 		ln -s $installPackage4LSFEXP lsfexpinstalldir
 	fi
+
+    if [ $isLS = "y" ]; then
+        ln -s $installPackageDir4LS lsinstalldir
+        ln -s $installPackageDir4LS_TOOLS lstoolsinstalldir
+    fi
+
 	
 	echo -e "Initializing Completed!\n"
 	#cp -r $installPackageDir installdir
@@ -239,6 +271,14 @@ function funcCreateNFS() {
 		docker cp -L $(pwd)/lsfexpinstalldir $nfs:$NFS
 		docker cp $(pwd)/installlsfexpserver.entrypoint.sh $nfs:$NFS
 	fi
+
+    if [ -L $(pwd)/lsinstalldir ]; then
+        docker cp -L $(pwd)/lsinstalldir $nfs:$NFS
+    fi
+
+    if [ -L $(pwd)/lstoolsinstalldir ]; then
+        docker cp -L $(pwd)/lstoolsinstalldir $nfs:$NFS
+    fi
 	
 	docker cp $(pwd)/install.entrypoint.sh $nfs:$NFS
 	docker cp $(pwd)/install.exp $nfs:$NFS
@@ -444,6 +484,7 @@ function funcInstall() {
 #	dmVersion=$4
 #	isLSFExp=$5
 #	ecIP=$6
+#   isLS=$7
 function funcInstallMC() {
 	echo "Starting MC Installation..."
 	# Standard LSF
@@ -457,8 +498,10 @@ function funcInstallMC() {
 	dmVersion=$4
 	isLSFExp=$5
 	ecIP=$6
+    isLS=$7
+    lsMode=$8
 	
-	case $lsfVersion in 
+	case $lsfVersion in
 			"9.1")
 					
 	
@@ -506,7 +549,7 @@ function funcInstallMC() {
 		LSF_TOP=$lsfTop
 		isMC="Y"
 		Install="Install.${lsfClusterName}-id$ID"
-		docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
+		docker run --privileged=true -idt --volumes-from $nfs --name $Install -h $lsfMasterName --cap-add=SYS_PTRACE -e "IS_LS=$isLS" -e "LS_MODE=$lsMode" -e "EC_IP=$ecIP" -e "IS_LSFEXP=$isLSFExp" -e "IS_SUBCLUSTER=$isSubCluster" -e "DM_VERSION=$dmVersion" -e "IS_DM=$isDM" -e "LSF_VERSION=$lsfVersion" -e "ID=$ID" -e "LSF_DOMAIN=$domain" -e "IS_MC=$isMC" -e "HOST_NUM=$HOST_NUM" -e "LSF_CLUSTER_NUM=$CLUSTER_NUM" -e "LSF_INSTALL_SCRIPT_FILE=$lsfInstallScriptFile" -e "LSF_INSTALL_BINARY_FILE=$lsfInstallBinaryfile" -e "LSF_INSTALL_ENTITLEMENT_FILE=$lsfInstallEntitlementFile" -e "LSF_CLUSTER_NAME=$lsfClusterName" -e "LSF_MASTER_NAME=$lsfMasterName" -e "LSF_TOP=$lsfTop" -e "LSF_TAR_DIR=$lsfTarDir"  --entrypoint $entryPointFile $IMAGE > /dev/null 2>&1
 		docker wait $Install > /dev/null 2>&1
 		echo "LSF Installation Completed for cluster: $lsfClusterName!"
 		
@@ -973,7 +1016,15 @@ function funcUserInteract() {
 			read -p "How many nodes in each cluster?:(2)" hNum
 			hNum=${hNum:-2}
 			HOST_NUM=$hNum
-			
+
+            read -p "Do you want to install License Scheduler?(y/n)(n)" isLS
+            isLS=${isLS:-"n"}
+            if [ $isLS = "y" ]; then
+                echo -e "Which mode do you want to configure the License Scheduler?\n1.Cluster Mode\n2.Project Mode"
+                read -p "Choose(1/2)(1)" lsMode
+                lsMode=${lsMode:-1}
+            fi
+
 			read -p "Do you want to install the latest patch?(y/n)(n)" needInstallPatch
 			needInstallPatch=${needInstallPatch:-"n"}
 			
@@ -992,18 +1043,19 @@ function funcUserInteract() {
 			fi
 			
 			
-			funcInitial $PRODUCTS_NAME $LSF_VERSION $isLSFExp
+			funcInitial $PRODUCTS_NAME $LSF_VERSION $isLSFExp $isLS
 			funcCreateNFS
 						
 			##	Params of funcLSFExpServerSetup
 			#	isLSFExp (y1 - Need to install Elastic Search Sever and Client, y0 - Need to install only Elastic Search Client or n - nothing to do)
-			funcLSFExpServerSetup $isLSFExp
+            ecIP="null" # Initialize ecIP. Otherwise if it is empty it will impact to input isLS and lsMode
+            funcLSFExpServerSetup $isLSFExp
 			
 			isDM="N"
 			dmVersion="null"
 			ecIP=$EC_IP #Global Env Var set by funcLSFExpServerSetup
 			
-			funcInstallMC $needInstallPatch $lsfVersion $isDM $dmVersion $isLSFExp $ecIP
+			funcInstallMC $needInstallPatch $lsfVersion $isDM $dmVersion $isLSFExp $ecIP $isLS $lsMode
 			funcBuildClusterMC
 
 

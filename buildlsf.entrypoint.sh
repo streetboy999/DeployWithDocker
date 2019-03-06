@@ -107,8 +107,26 @@ function trapSignal_StartLSF(){
 				. /opt/ibm/$CLUSTER_NAME/lsfsuite/ext/perf/conf/profile.perf
 				perfadmin start plc
 			fi
-	fi	
+	fi
+
+    # Start Flexlm License Sever
+    # In MC only start the license server on c1-master
+    # In a single cluster only start the license server on the master node
+    hname=`hostname`
+    if [[ $hname =~ "-master" ]]; then
+        echo "this is a MC cluster"
+        if [[ $1 =~ "c1-master" ]]; then
+            echo "This is the master node in MC"
+        fi
+    else
+        echo "This is a single cluster"
+        if [[  $hname =~ "master" ]]; then
+            echo "This is the master node in a single cluster"
+        fi
+    fi
 }
+
+
 
 trap trapSignal SIGUSR1
 
