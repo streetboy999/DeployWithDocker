@@ -173,9 +173,11 @@ function funcInitial() {
 					fi
 
                     # Check if LS will be installed
-                    if [ $isLS = "y" ]; then
-                        installPackageDir4LS=$INSTALL_PACKAGE_DIR_FOR_LS9
-                        installPackageDir4LS_TOOLS=$INSTALL_PACKAGE_DIR_FOR_LS_TOOLS
+                    if test ! -z $isLS; then
+                        if [ $isLS = "y" ]; then
+                            installPackageDir4LS=$INSTALL_PACKAGE_DIR_FOR_LS9
+                            installPackageDir4LS_TOOLS=$INSTALL_PACKAGE_DIR_FOR_LS_TOOLS
+                        fi
                     fi
 			;;
 			
@@ -220,9 +222,11 @@ function funcInitial() {
 		ln -s $installPackage4LSFEXP lsfexpinstalldir
 	fi
 
-    if [ $isLS = "y" ]; then
-        ln -s $installPackageDir4LS lsinstalldir
-        ln -s $installPackageDir4LS_TOOLS lstoolsinstalldir
+    if test ! -z $isLS; then
+        if [ $isLS = "y" ]; then
+            ln -s $installPackageDir4LS lsinstalldir
+            ln -s $installPackageDir4LS_TOOLS lstoolsinstalldir
+        fi
     fi
 
 	

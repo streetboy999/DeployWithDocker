@@ -52,7 +52,13 @@ fi
 	if [ -f /opt/ibm/$CLUSTER_NAME/lsfsuite/ext/perf/conf/profile.perf ]; then
 		echo '. /opt/ibm/$CLUSTER_NAME/lsfsuite/ext/perf/conf/profile.perf' >> $setupFile
 	fi
+
+    if [ -d /opt/lstoolsinstalldir/flexlm10.8/ ]; then
+        echo 'export PATH=$PATH:/opt/lstoolsinstalldir/flexlm10.8' >> $setupFile
+    fi
+
 	echo 'script -q -c "/bin/bash" /dev/null' >> $setupFile
+
 
         # For Centos the command should change to service sshd start
         # For Ubuntu the command is "service ssh start"
@@ -78,6 +84,33 @@ fi
 				perfadmin start plc
 			fi
 	fi
+
+    # Start Flexlm License Sever
+    # In MC only start the license server on c1-master
+    # In a single cluster only start the license server on the master node
+    hname=`hostname`
+    if [[ $hname =~ "-master" ]]; then
+        echo "this is a MC cluster"
+        if [[ $hname =~ "c1-master" ]]; then
+            echo "This is the master node in MC"
+            # Start Flexlm license server and bld
+            ps -ef | grep lmgrd | grep -v grep
+            if [ $? = 1 ]; then
+                /opt/lstoolsinstalldir/flexlm10.8/lmgrd -c /opt/lstoolsinstalldir/license1.dat -l /tmp/lic.log
+                echo "Flexlm License Sever is started"
+            fi
+            ps -ef | grep bld | grep -v grep
+            if [ $? = 1 ]; then
+                blstartup
+                echo "LS is started"
+            fi
+        fi
+    else
+        echo "This is a single cluster"
+        if [[  $hname =~ "master" ]]; then
+            echo "This is the master node in a single cluster"
+        fi
+    fi
 	
 	# Set ssh password-less
 	cd /opt/sshnopasswd
@@ -115,8 +148,19 @@ function trapSignal_StartLSF(){
     hname=`hostname`
     if [[ $hname =~ "-master" ]]; then
         echo "this is a MC cluster"
-        if [[ $1 =~ "c1-master" ]]; then
+        if [[ $hname =~ "c1-master" ]]; then
             echo "This is the master node in MC"
+            # Start Flexlm license server and bld
+            ps -ef | grep lmgrd | grep -v grep
+            if [ $? = 1 ]; then
+                /opt/lstoolsinstalldir/flexlm10.8/lmgrd -c /opt/lstoolsinstalldir/license1.dat -l /tmp/lic.log
+                echo "Flexlm License Sever is started"
+            fi
+            ps -ef | grep bld | grep -v grep
+            if [ $? = 1 ]; then
+                blstartup
+                echo "LS is started"
+            fi
         fi
     else
         echo "This is a single cluster"
