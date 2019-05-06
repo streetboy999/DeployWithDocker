@@ -192,11 +192,12 @@ function funcInitial() {
 					fi
 
                     # Check if LS will be installed
-                    if [ $isLS = "y" ]; then
-                        installPackageDir4LS=$INSTALL_PACKAGE_DIR_FOR_LS10
-                        installPackageDir4LS_TOOLS=$INSTALL_PACKAGE_DIR_FOR_LS_TOOLS
-                    fi
-					
+                    if test ! -z $isLS; then
+		    	if [ $isLS = "y" ]; then
+                        	installPackageDir4LS=$INSTALL_PACKAGE_DIR_FOR_LS10
+                        	installPackageDir4LS_TOOLS=$INSTALL_PACKAGE_DIR_FOR_LS_TOOLS
+                    	fi
+		    fi			
 			;;
 			
 			*)
