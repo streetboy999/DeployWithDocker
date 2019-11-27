@@ -10,6 +10,9 @@ https://store.docker.com/editions/community/docker-ce-desktop-mac?tab=descriptio
 
 (2) Download and Install Xquartz (XGUI) for Mac
 https://www.xquartz.org/releases/XQuartz-2.7.11.html
+PS:
+Reboot the OS after Xquartz is installed. 
+Check "Allow connections from network clients" in the preferences of Xquartz
 
 (2) Copy the deployment file
 Beijing Lab: scp bjhc01.eng.platformlab.ibm.com:/scratch/support3/cwwu/Mybox/Project/Auto.tar.gz .
